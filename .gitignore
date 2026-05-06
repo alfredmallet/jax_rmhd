@@ -1,5 +1,9 @@
+#Snapshots folder
+snapshots/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
+solver/__pycache__/
 *.py[codz]
 *$py.class
 
