@@ -1,0 +1,14 @@
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "jax-rmhd"
+version = "0.1.0"
+description = "Spectral RMHD solver in JAX"
+dependencies = [
+    "jax",
+    "jaxlib",
+    "orbax-checkpoint",
+    "numpy",
+]
