@@ -11,7 +11,7 @@ def get_precision_types():
         return jnp.float32, jnp.complex64
     
 # Setting up Orbax stuff
-def snapshot_manager_setup(snap_path,nsnap):
+def snapshot_manager_setup(snap_path="data",nsnap=100):
     checkpoint_path = os.path.abspath(snap_path)
     options = ocp.CheckpointManagerOptions(max_to_keep=nsnap, create=True)
     return ocp.CheckpointManager(checkpoint_path,ocp.StandardCheckpointer(),options=options)

@@ -1,5 +1,5 @@
-#Snapshots folder
-snapshots/
+#Data (snapshots etc) folder
+data/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
