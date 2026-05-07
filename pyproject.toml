@@ -12,3 +12,6 @@ dependencies = [
     "orbax-checkpoint",
     "numpy",
 ]
+
+[tool.setuptools]
+packages = ["jax_rmhd"]

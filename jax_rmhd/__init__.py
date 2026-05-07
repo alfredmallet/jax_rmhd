@@ -14,3 +14,4 @@ from .physics import SimulationState, Fields
 from .fourier import K_Grids, setup_kgrids
 from .config import Parameters
 from .snapshot_io import snapshot_manager_setup
+from .run import simulate

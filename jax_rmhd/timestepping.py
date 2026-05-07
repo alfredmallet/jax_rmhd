@@ -21,6 +21,7 @@ def set_timestep(grads,params):
 #TODO: add support for LSRK3 and LSRK54 schemes.
 @partial(jax.jit, static_argnums=(2,))
 def rk_advance(state,kgrid,params):
+    print("---COMPILING rk_advance---")
     #grad
     grads=grad(state,kgrid,params)
     #cfl
@@ -54,7 +55,8 @@ def rk_advance(state,kgrid,params):
 
 @partial(jax.jit, static_argnums=(2, 3))
 def block_of_steps(state,kgrid,params,nblock):
-    print("---COMPILING---")
+    #this print is a side effect, it will only trigger the first couple times the function runs as jax traces it for compiling
+    print("---COMPILING block_of_steps---")
     def stepping(state,_):
         return rk_advance(state,kgrid,params), None
     final_state,_ = jax.lax.scan(stepping,state,None,nblock)

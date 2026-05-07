@@ -12,8 +12,8 @@ def spec(state,kgrid,params):
     spec_b=list()
     for kk in range(kmax):
         cond=(kk<=jnp.sqrt(kgrid.ksq()))*(jnp.sqrt(kgrid.ksq())<kk+1)
-        spec_u.append(jnp.sum(energy_u*cond)/n**4)
-        spec_b.append(jnp.sum(energy_b*cond)/n**4)
+        spec_u.append(jnp.sum(energy_u*cond)/float(n)**4)
+        spec_b.append(jnp.sum(energy_b*cond)/float(n)**4)
     return (jnp.array(spec_u),jnp.array(spec_b))
 
 def energy(fields,kgrid):
