@@ -1,7 +1,6 @@
 import jax
 from jax import jit
 import jax.numpy as jnp
-import jax.numpy.fft as ft
 from functools import partial
 from typing import NamedTuple, Tuple
 from . import config
@@ -21,8 +20,8 @@ class SimulationState(NamedTuple):
     t: float
     fields: Fields
 
-@partial(jax.jit, static_argnums=(2,))
-def grad(state,kgrids,params):
+@jit
+def grad(state,kgrids):
     # takes fourier state input, dealiases, and returns real-space gradients as a tuple of tuples
     # this is specific to each equation set since we need the vorticities etc. currently rmhd
     phik = state.fields.phik * kgrids.dealias_filter()
@@ -31,7 +30,7 @@ def grad(state,kgrids,params):
     jpark = -kgrids.ksq()*psik
     fk = (phik, psik, vortk, jpark)
     gfk = jax.tree_util.tree_map(lambda f: gradk(f,kgrids),fk)
-    gradients=jax.tree_util.tree_map(lambda p: ft.irfft2(p, s=(params.n, params.n)), gfk)
+    gradients=jax.tree_util.tree_map(lambda p: fourier.ifft(p), gfk)
     return Gradients(*gradients)
 
 #Holds all the gradients needed for the nonlinear terms in real space
@@ -51,6 +50,6 @@ def NonlinearTerm(grads,kgrid):
                   #- (grads.phi[0]*grads.vort[1] - grads.phi[1]*grads.vort[0]))
     NLTerm_psi = - bracket(grads.phi,grads.psi)
     #- (grads.phi[0]*grads.psi[1] - grads.phi[1]*grads.psi[0])
-    (NLTerm_vort_k , NLTerm_psi_k) = jax.tree_util.tree_map(ft.rfft2,(NLTerm_vort,NLTerm_psi))
+    (NLTerm_vort_k , NLTerm_psi_k) = jax.tree_util.tree_map(fourier.fft,(NLTerm_vort,NLTerm_psi))
     return Fields(phik = -kgrid.inv_ksq()*NLTerm_vort_k*kgrid.dealias_filter(), 
                   psik = NLTerm_psi_k*kgrid.dealias_filter())

@@ -20,13 +20,14 @@ class K_Grids(NamedTuple):
 def setup_kgrids(params):
     # Gets the wavenumber grid object from parameters.
     # In the future this should depend on Lx,Ly,nx,ny
-    n=params.n
-    kx = ft.fftfreq(n) * n
-    ky = ft.rfftfreq(n) * n
+    kx = ft.fftfreq(params.nx) * params.nx * 2 * jnp.pi / params.Lx
+    ky = ft.rfftfreq(params.ny) * params.ny * 2 * jnp.pi / params.Ly
     kx_grid = kx.reshape(-1, 1)
     ky_grid = ky.reshape(1, -1)    
     return K_Grids(kx=kx_grid,ky=ky_grid)
 
 def fft(x):
-    #this wrapper isn't actually used, lol.
-    return ft.rfft2(x)
+    return ft.rfft2(x,axes=(-2,-1))
+
+def ifft(x):
+    return ft.irfft2(x,axes=(-2,-1))

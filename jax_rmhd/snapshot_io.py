@@ -20,7 +20,7 @@ def save_snapshot(isnap,state,mngr):
     return mngr.save(isnap, args=ocp.args.StandardSave(state), metrics={"time": float(state.t)})
 
 def load_snapshot(isnap,mngr,params):
-    shape_complex = (params.n, params.n // 2 + 1)
+    shape_complex = (params.nx, params.ny // 2 + 1)
     ftype, ctype = get_precision_types()
     phik_like = jax.ShapeDtypeStruct(shape_complex, ctype)
     psik_like = jax.ShapeDtypeStruct(shape_complex, ctype)
