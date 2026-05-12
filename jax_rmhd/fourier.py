@@ -1,6 +1,8 @@
 import jax.numpy as jnp
 import jax.numpy.fft as ft
-from typing import NamedTuple, Tuple
+from typing import NamedTuple
+
+#nb the code is only spectral in the perpendciular plane, so this is all 2D
 
 class K_Grids(NamedTuple):
     # Stores the wavenumber grids and methods
