@@ -42,16 +42,15 @@ def init_cluster():
 
 def setup_sharding(params):
     #Sets up parallelization of fields along the z axis if we're in 3D.
+    n_devices = jax.device_count()
     if params.spatial_dimensions==3:
-        n_devices = jax.device_count()
         devices = mesh_utils.create_device_mesh((n_devices,))
         mesh = Mesh(devices, axis_names=('z_axis',))
         z_sharding = NamedSharding(mesh, PartitionSpec('z_axis', None, None))
-        fields_sharding = Fields(phik=z_sharding, psik=z_sharding)
-        state_sharding = SimulationState(t=None,fields=fields_sharding)
-        return (z_sharding,fields_sharding,state_sharding)
     else:
-        n_devices = jax.device_count()
+        z_sharding = None
         if n_devices > 1:
             print("You probably should only run a 2D run on one device, since this isn't parallelized.")
-        return (None, None, None)
+    fields_sharding = Fields(phik=z_sharding, psik=z_sharding)
+    state_sharding = SimulationState(t=None,fields=fields_sharding)
+    return (z_sharding,fields_sharding,state_sharding)

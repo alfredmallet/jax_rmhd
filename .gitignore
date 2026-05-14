@@ -2,6 +2,9 @@
 data/
 examples/data
 
+#Random stray png
+*.png
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 solver/__pycache__/

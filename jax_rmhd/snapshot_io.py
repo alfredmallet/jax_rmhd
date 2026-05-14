@@ -1,6 +1,7 @@
 import jax
 import jax.numpy as jnp
 import orbax.checkpoint as ocp
+import tensorstore as ts
 import os
 from .types import Fields,SimulationState
 
@@ -21,41 +22,42 @@ def save_snapshot(isnap,state,mngr):
 
 def load_snapshot(isnap,mngr,params,shardings):
     #This will load the whole snapshot into memory; on a cluster it should work in a distributed way.
-    _,_,state_sharding=shardings
+    z_sharding,f_sharding,s_sharding=shardings
     if params.spatial_dimensions==3:
         shape_complex = (params.nz, params.nx, params.ny // 2 + 1)
     else:
         shape_complex = (params.nx, params.ny // 2 + 1)
     ftype, ctype = get_precision_types()
-    phik_like = jax.ShapeDtypeStruct(shape_complex, ctype)
-    psik_like = jax.ShapeDtypeStruct(shape_complex, ctype)
+    phik_like = jax.ShapeDtypeStruct(shape_complex, ctype,sharding=z_sharding)
+    psik_like = jax.ShapeDtypeStruct(shape_complex, ctype,sharding=z_sharding)
     fields_like = Fields(phik=phik_like,psik=psik_like)
     state_like = SimulationState(t=jax.ShapeDtypeStruct((), ftype), fields=fields_like)
-    if state_sharding is not None:
-        state_target = jax.tree_util.tree_map(
-            lambda x, s: jax.device_put(x, s),
-            state_like, 
-            state_sharding
-        )
-    else:
-        state_target = state_like
-    return mngr.restore(isnap, args=ocp.args.StandardRestore(state_target))
+    restore_args =  ocp.args.StandardRestore(state_like)
+    return mngr.restore(isnap, args=restore_args)
 
-def load_slice(isnap,iz,nzslice,mngr,params):
-    #This loads a slice of a snapshot into memory: useful for laptop diagnostics
-    shape_slice = (nzslice, params.nx, params.ny//2 + 1)
-    ftype, ctype = get_precision_types()
-    phik_like = jax.ShapeDtypeStruct(shape_slice, ctype)
-    psik_like = jax.ShapeDtypeStruct(shape_slice, ctype)
-    fields_like = Fields(phik=phik_like,psik=psik_like)
-    state_like = SimulationState(t=jax.ShapeDtypeStruct((), ftype), fields=fields_like)
-    def slicer(full_array):
-        return jax.lax.dynamic_slice(full_array,(iz,0,0),shape_slice)
-    slice_transforms = {
-        "fields": {
-            "phik": slicer,
-            "psik": slicer
-        }
+def find_items(isnap,snap_path):
+    db_path=os.path.join(snap_path, str(isnap), "default")
+
+    kv_spec = {
+        'driver': 'ocdbt',
+        'base': {'driver': 'file', 'path': db_path}
     }
-    return mngr.restore(isnap, args=ocp.args.StandardRestore(target=state_like,
-                                                             transforms=slice_transforms))
+    kvs = ts.KvStore.open(kv_spec).result()
+
+    print("Found these keys in the database:")
+    for key in kvs.list().result():
+        print(f"  {key.decode()}")
+
+def load_slice(isnap,iz,nzslice,snap_path,item='fields.phik'):
+    #This loads a slice of a snapshot into memory: useful for laptop diagnostics
+    #Use find_items to check what to put as item here.
+    db_path = os.path.join(snap_path, str(isnap), "default")
+    spec = {'driver': 'zarr', 'kvstore': {
+        'driver': 'ocdbt', 'base': {
+            'driver': 'file', 'path': db_path,
+            }
+        },
+        'path': item,       
+    }
+    f = ts.open(spec).result()
+    return f[iz:iz+nzslice , :, :].read().result()

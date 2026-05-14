@@ -40,7 +40,7 @@ def simulate_scan(initial_state,kgrid,params,nblock,t_snap,t_end,shardings,mngr)
     mngr.wait_until_finished()
     return f"Ending simulation at t = " + str(state.t)
 
-def simulate(initial_state,kgrid,params,t_snap,t_end,mngr,shardings):
+def simulate(initial_state,kgrid,params,t_snap,t_end,mngr,shardings,save=True):
     _,_,state_sharding = shardings
     rk_advance_jit=jax.jit(rk_advance,static_argnums=(2,),
                            in_shardings=(state_sharding, None),
@@ -49,19 +49,22 @@ def simulate(initial_state,kgrid,params,t_snap,t_end,mngr,shardings):
         return rk_advance_jit(state,kgrid,params)
     state=initial_state
     t_last_snapshot = state.t
-    snap=0   
-    print("Saving initial state as snapshot "+str(snap))
-    save_snapshot(snap,state,mngr)
+    snap=0
+    if save:   
+        print("Saving initial state as snapshot "+str(snap))
+        save_snapshot(snap,state,mngr)
     while state.t<t_end:
-        snap=snap+1
         def snap_cond(state):
             t_next_snapshot=t_last_snapshot+t_snap
             return state.t<t_next_snapshot
         state = jax.lax.while_loop(snap_cond,stepping,state)
-        state.fields.phik.block_until_ready()
-        print ("Saving snapshot "+str(snap)+ " at t = "+str(state.t))
-        save_snapshot(snap,state,mngr)
-        t_last_snapshot=state.t
+        snap=snap+1
+        if save:
+            state.fields.phik.block_until_ready()
+            print ("Saving snapshot "+str(snap)+ " at t = "+str(state.t))
+            save_snapshot(snap,state,mngr)
+            t_last_snapshot=state.t
     mngr.wait_until_finished()
-    return f"Ending simulation at t = "+str(state.t)
+    print(f"Ending simulation at t = "+str(state.t))
+    return state
 
