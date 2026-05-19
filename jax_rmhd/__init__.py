@@ -14,4 +14,4 @@ from .types import SimulationState, Fields
 from .fourier import K_Grids, setup_kgrids
 from .config import Parameters,init_cluster,setup_sharding
 from .snapshot_io import snapshot_manager_setup
-from .run import simulate
+from .run import simulate,simulate_scan,estimate_good_nblock

@@ -10,9 +10,10 @@ def gradk(fk,kgrid):
 
 def grad(state,kgrids):
     # takes fourier state input, dealiases, and returns real-space gradients as a tuple of tuples
+    # we don't need to dealias here: we do it at the end of NonlinearTerm instead.
     # this is specific to each equation set since we need the vorticities etc. currently rmhd
-    phik = state.fields.phik * kgrids.dealias_filter()
-    psik = state.fields.psik * kgrids.dealias_filter()
+    phik = state.fields.phik
+    psik = state.fields.psik
     vortk = -kgrids.ksq()*phik
     jpark = -kgrids.ksq()*psik
     fk = (phik, psik, vortk, jpark)
@@ -53,3 +54,13 @@ def LinearTerm(state,params):
     dpsik_dz = df_dz.phik
     df_dz_rmhd = Fields(phik = dphik_dz,psik=dpsik_dz)
     return jax.tree_util.tree_map(lambda fz,f4z4: (fz - diss*f4z4), df_dz_rmhd,d4f_dz4)
+
+# returns the non-dissipative parts of the RMHD rhs, tree_mapping over the fields
+# for future compatibility. NB: The dissipative terms are handled in timestepping.py
+# via integrating factors.
+def rhs(state,kgrid,params):
+    grads=grad(state,kgrid)
+    if params.spatial_dimensions==3:
+        return jax.tree_util.tree_map(jnp.add,NonlinearTerm(grads,kgrid),LinearTerm(state,params)),grads
+    else:
+        return NonlinearTerm(grads,kgrid),grads
