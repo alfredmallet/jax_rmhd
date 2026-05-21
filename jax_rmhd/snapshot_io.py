@@ -48,7 +48,7 @@ def find_items(isnap,snap_path):
     for key in kvs.list().result():
         print(f"  {key.decode()}")
 
-def load_slice(isnap,iz,nzslice,snap_path,item='fields.phik'):
+def load_slice(isnap,iz,nzslice,snap_path,item='fields'):
     #This loads a slice of a snapshot into memory: useful for laptop diagnostics
     #Use find_items to check what to put as item here.
     db_path = os.path.join(snap_path, str(isnap), "default")

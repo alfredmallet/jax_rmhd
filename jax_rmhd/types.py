@@ -9,11 +9,4 @@ class Fields(NamedTuple):
 
 class SimulationState(NamedTuple):
     t: float
-    fields: Fields
-
-#Holds all the gradients needed for the nonlinear terms in real space
-class Gradients(NamedTuple):
-    phi: jnp.ndarray
-    psi: jnp.ndarray
-    vort: jnp.ndarray
-    jpar: jnp.ndarray
+    fields: jnp.ndarray

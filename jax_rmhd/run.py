@@ -1,11 +1,12 @@
 import jax
-from .timestepping import get_scheme,set_timestep
+from .timestepping import get_scheme
 from .snapshot_io import save_snapshot
-from .physics import grad
 from time import perf_counter
+from .physics import equation_registry, construct_rhs
 
 #This can be used to estimate a good nblock. You can set the minimum higher.
 def estimate_good_nblock(state,kgrid,params,t_snap,t_end,t_last_snap=0,nblock_min=10):
+    set_timestep,_,grad = equation_registry[params.eqtype] 
     grads = grad(state,kgrid)
     dt = set_timestep(grads,params)
     t_next_snap = min(t_last_snap+t_snap,t_end)
@@ -14,7 +15,9 @@ def estimate_good_nblock(state,kgrid,params,t_snap,t_end,t_last_snap=0,nblock_mi
 
 def block_of_steps(state,kgrid,params,nblock,scheme,stepper):
     def stepping(state,_):
-        return stepper(state,kgrid,params,scheme), None
+        set_timestep = equation_registry[params.eqtype].set_timestep_func
+        rhs = construct_rhs(equation_registry[params.eqtype])
+        return stepper(state,kgrid,params,rhs,set_timestep,scheme), None
     final_state,_ = jax.lax.scan(stepping,state,None,nblock)
     return final_state,None
 
