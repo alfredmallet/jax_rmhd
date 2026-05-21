@@ -7,7 +7,6 @@ from typing import NamedTuple,Tuple
 # Standard RK4 with integrating factor.
 # Problem is it uses a lot of memory on k1-k4.
 # I think it is always better to use the LSRK schemes
-# This currently is not set up properly to use the correct RHS function constructed in physics
 
 def rk_advance(state,kgrid,params,rhs,set_timestep,scheme=None):
     #print("---COMPILING rk_advance---") #add this back in to check that jit is working properly

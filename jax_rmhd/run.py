@@ -1,4 +1,5 @@
 import jax
+import jax.numpy as jnp
 from .timestepping import get_scheme
 from .snapshot_io import save_snapshot
 from time import perf_counter
@@ -58,11 +59,15 @@ def simulate(initial_state,kgrid,params,t_snap,t_end,mngr,shardings,schemestr='l
     t_start = perf_counter()
     _,_,state_sharding = shardings
     stepper,scheme = get_scheme(schemestr)
-    stepper_jit=jax.jit(stepper,static_argnums=(2,3),
-                           in_shardings=(state_sharding, None),
-                             out_shardings=state_sharding)
-    def stepping(state):
-        return stepper_jit(state,kgrid,params,scheme)
+    set_timestep = equation_registry[params.eqtype].set_timestep_func
+    rhs = construct_rhs(equation_registry[params.eqtype])
+    def stepper_wrapped(state):
+        return stepper(state,kgrid,params,rhs,set_timestep,scheme)
+    def sim_to_next_snap(state,target_t):
+        def snap_cond(state):
+            return state.t<target_t
+        return jax.lax.while_loop(snap_cond,stepper_wrapped,state)
+    sim_to_next_snap_jit = jax.jit(sim_to_next_snap,in_shardings=(state_sharding,None),out_shardings=state_sharding)
     state=initial_state
     t_last_snapshot = state.t
     snap=0
@@ -70,13 +75,10 @@ def simulate(initial_state,kgrid,params,t_snap,t_end,mngr,shardings,schemestr='l
         print("Saving initial state as snapshot "+str(snap))
         save_snapshot(snap,state,mngr)
     while state.t<t_end:
-        def snap_cond(state):
-            t_next_snapshot=t_last_snapshot+t_snap
-            return state.t<t_next_snapshot
-        state = jax.lax.while_loop(snap_cond,stepping,state)
+        t_next_snapshot=min(t_last_snapshot+t_snap,t_end)
+        state = sim_to_next_snap_jit(state,t_next_snapshot)
         snap=snap+1
         if save:
-            state.fields.phik.block_until_ready()
             print ("Saving snapshot "+str(snap)+ " at t = "+str(state.t))
             save_snapshot(snap,state,mngr)
             t_last_snapshot=state.t

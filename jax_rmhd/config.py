@@ -7,7 +7,7 @@ class Parameters():
     #Stores all static parameters for the problem
     def __init__(self,nx,ny,Lx,Ly,diss,hyper,cfl_safety,dims=2,nz=0,Lz=0.0,z_diss=0.25,z_diss_hyper=2.0,z_diff_order=4,eqtype="RMHD"):
         self.eqtype=eqtype
-        self.nfields=_eqtype_registry[self.eqtype]
+        self.nfields=eqtype_registry[self.eqtype]
         #perpendicular grid
         self.nx=nx
         self.ny=ny
@@ -34,7 +34,7 @@ class Parameters():
             self.z_diff_order = z_diff_order #currently unused, set =4
 
 # registry to set the # of fields we are solving for
-_eqtype_registry = {
+eqtype_registry = {
     "RMHD": 2
 }
 
