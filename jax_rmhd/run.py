@@ -53,7 +53,8 @@ def simulate_scan(initial_state,kgrid,params,nblock,t_snap,t_end,mngr,shardings,
     save_snapshot(snap,state,mngr)
     mngr.wait_until_finished()
     t_sim = perf_counter()-t_start
-    return f"Ending simulation at t = " + str(state.t)+". It took "+str(t_sim)+"s"
+    print(f"Ending simulation at t = " + str(state.t)+". It took "+str(t_sim)+"s")
+    return state
 
 def simulate(initial_state,kgrid,params,t_snap,t_end,mngr,shardings,schemestr='lsrk33',save=True):
     t_start = perf_counter()
