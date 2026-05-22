@@ -28,7 +28,7 @@ def block_of_steps(state,kgrid,params,nblock,scheme,stepper):
 #currently an orbax checkpoint mngr must be set outside of the simulate function
 #this makes it a little easier to set up snapshots etc but could be changed
 
-def simulate_scan(initial_state,kgrid,params,nblock,t_snap,t_end,mngr,schemestr='lsrk33'):
+def simulate_scan(state,kgrid,params,nblock,t_snap,t_end,mngr,schemestr='lsrk33'):
     # this simulates for a fixed number of timesteps
     # for automatic differentiation sometime in the future
     # we should set nblock using the helper function estimate_good_nblock
@@ -37,7 +37,6 @@ def simulate_scan(initial_state,kgrid,params,nblock,t_snap,t_end,mngr,schemestr=
     block_of_steps_jit = jax.jit(block_of_steps,static_argnums=(2,3,4,5),
                            in_shardings=(params.state_sharding, None),
                              out_shardings=(params.state_sharding,None))
-    state=initial_state
     t_last_snapshot = state.t
     snap=0
     print("Saving initial state as snapshot "+str(snap))
