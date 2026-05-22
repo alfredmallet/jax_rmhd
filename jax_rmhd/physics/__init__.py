@@ -11,7 +11,7 @@ class EquationRecipe(NamedTuple):
 # NB: The dissipative terms are handled via integrating factor in timestepping.py
 def construct_rhs(recipe):
     def rhs(state,kgrid,params):
-        grads=recipe.grad_func(state,kgrid)
+        grads=recipe.grad_func(state,kgrid,params)
         fields_rhs = None
         for term in recipe.term_funcs:
             if fields_rhs is None:

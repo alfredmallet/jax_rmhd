@@ -5,10 +5,13 @@ from .snapshot_io import save_snapshot
 from time import perf_counter
 from .physics import equation_registry, construct_rhs
 
+#debug
+from jax.debug import inspect_array_sharding
+
 #This can be used to estimate a good nblock. You can set the minimum higher.
 def estimate_good_nblock(state,kgrid,params,t_snap,t_end,t_last_snap=0,nblock_min=10):
     set_timestep,_,grad = equation_registry[params.eqtype] 
-    grads = grad(state,kgrid)
+    grads = grad(state,kgrid,params)
     dt = set_timestep(grads,params)
     t_next_snap = min(t_last_snap+t_snap,t_end)
     nblock_estimate = max((t_next_snap-state.t)/dt,nblock_min)
@@ -25,16 +28,15 @@ def block_of_steps(state,kgrid,params,nblock,scheme,stepper):
 #currently an orbax checkpoint mngr must be set outside of the simulate function
 #this makes it a little easier to set up snapshots etc but could be changed
 
-def simulate_scan(initial_state,kgrid,params,nblock,t_snap,t_end,mngr,shardings,schemestr='lsrk33'):
+def simulate_scan(initial_state,kgrid,params,nblock,t_snap,t_end,mngr,schemestr='lsrk33'):
     # this simulates for a fixed number of timesteps
     # for automatic differentiation sometime in the future
     # we should set nblock using the helper function estimate_good_nblock
     t_start = perf_counter()
-    _,_,state_sharding=shardings
     stepper,scheme = get_scheme(schemestr)
     block_of_steps_jit = jax.jit(block_of_steps,static_argnums=(2,3,4,5),
-                           in_shardings=(state_sharding, None),
-                             out_shardings=(state_sharding,None))
+                           in_shardings=(params.state_sharding, None),
+                             out_shardings=(params.state_sharding,None))
     state=initial_state
     t_last_snapshot = state.t
     snap=0
@@ -56,9 +58,8 @@ def simulate_scan(initial_state,kgrid,params,nblock,t_snap,t_end,mngr,shardings,
     print(f"Ending simulation at t = " + str(state.t)+". It took "+str(t_sim)+"s")
     return state
 
-def simulate(initial_state,kgrid,params,t_snap,t_end,mngr,shardings,schemestr='lsrk33',save=True):
+def simulate(initial_state,kgrid,params,t_snap,t_end,mngr,schemestr='lsrk33',save=True):
     t_start = perf_counter()
-    _,_,state_sharding = shardings
     stepper,scheme = get_scheme(schemestr)
     set_timestep = equation_registry[params.eqtype].set_timestep_func
     rhs = construct_rhs(equation_registry[params.eqtype])
@@ -68,7 +69,9 @@ def simulate(initial_state,kgrid,params,t_snap,t_end,mngr,shardings,schemestr='l
         def snap_cond(state):
             return state.t<target_t
         return jax.lax.while_loop(snap_cond,stepper_wrapped,state)
-    sim_to_next_snap_jit = jax.jit(sim_to_next_snap,in_shardings=(state_sharding,None),out_shardings=state_sharding)
+    sim_to_next_snap_jit = jax.jit(sim_to_next_snap,
+                                   in_shardings=(params.state_sharding,None),
+                                   out_shardings=params.state_sharding)
     state=initial_state
     t_last_snapshot = state.t
     snap=0
@@ -77,7 +80,9 @@ def simulate(initial_state,kgrid,params,t_snap,t_end,mngr,shardings,schemestr='l
         save_snapshot(snap,state,mngr)
     while state.t<t_end:
         t_next_snapshot=min(t_last_snapshot+t_snap,t_end)
+        print("State sharding entering jit:", state.fields.sharding)
         state = sim_to_next_snap_jit(state,t_next_snapshot)
+        print("State sharding exiting jit:", state.fields.sharding)
         snap=snap+1
         if save:
             print ("Saving snapshot "+str(snap)+ " at t = "+str(state.t))

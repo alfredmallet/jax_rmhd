@@ -3,7 +3,7 @@ import jax.numpy as jnp
 import orbax.checkpoint as ocp
 import tensorstore as ts
 import os
-from .types import Fields,SimulationState
+from .types import SimulationState
 
 def get_precision_types():
     if jax.config.read("jax_enable_x64"):
@@ -12,7 +12,7 @@ def get_precision_types():
         return jnp.float32, jnp.complex64
     
 # Setting up Orbax stuff
-def snapshot_manager_setup(snap_path="data",nsnap=100):
+def snapshot_manager_setup(snap_path="data",nsnap=1000):
     checkpoint_path = os.path.abspath(snap_path)
     options = ocp.CheckpointManagerOptions(max_to_keep=nsnap, create=True)
     return ocp.CheckpointManager(checkpoint_path,ocp.StandardCheckpointer(),options=options)
@@ -20,17 +20,14 @@ def snapshot_manager_setup(snap_path="data",nsnap=100):
 def save_snapshot(isnap,state,mngr):
     return mngr.save(isnap, args=ocp.args.StandardSave(state), metrics={"time": float(state.t)})
 
-def load_snapshot(isnap,mngr,params,shardings):
+def load_snapshot(isnap,mngr,params):
     #This will load the whole snapshot into memory; on a cluster it should work in a distributed way.
-    z_sharding,f_sharding,s_sharding=shardings
     if params.spatial_dimensions==3:
-        shape_complex = (params.nz, params.nx, params.ny // 2 + 1)
+        shape_complex = (params.nfields,params.nz, params.nx, params.ny // 2 + 1)
     else:
         shape_complex = (params.nx, params.ny // 2 + 1)
     ftype, ctype = get_precision_types()
-    phik_like = jax.ShapeDtypeStruct(shape_complex, ctype,sharding=z_sharding)
-    psik_like = jax.ShapeDtypeStruct(shape_complex, ctype,sharding=z_sharding)
-    fields_like = Fields(phik=phik_like,psik=psik_like)
+    fields_like = jax.ShapeDtypeStruct(shape_complex, ctype,sharding=params.fields_sharding)
     state_like = SimulationState(t=jax.ShapeDtypeStruct((), ftype), fields=fields_like)
     restore_args =  ocp.args.StandardRestore(state_like)
     return mngr.restore(isnap, args=restore_args)

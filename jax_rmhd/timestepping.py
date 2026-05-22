@@ -1,8 +1,11 @@
 import jax
 from jax import jit
 import jax.numpy as jnp
-from .types import Fields,SimulationState
+from .types import SimulationState
 from typing import NamedTuple,Tuple
+
+#debug
+from jax.debug import inspect_array_sharding
 
 # Standard RK4 with integrating factor.
 # Problem is it uses a lot of memory on k1-k4.
@@ -66,8 +69,9 @@ def lsrk_advance(state, kgrid, params, rhs, set_timestep, scheme):
         diss_factors = jnp.exp(diss_exponents*gamma)
 
         next_delta = diss_factors * (alpha * delta + dt * stage_rhs)
+        #inspect_array_sharding(next_delta, callback=lambda s: print(f"--- next_delta when created: {s}"))
         next_fields = diss_factors * current_state.fields + beta*next_delta
-
+        #inspect_array_sharding(next_fields, callback=lambda s: print(f"--- next_fields when created: {s}"))
         next_t = current_state.t + gamma*dt
         return (SimulationState(t=next_t,fields=next_fields),next_delta), None
     

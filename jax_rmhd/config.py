@@ -10,6 +10,9 @@ class Parameters():
         self.nfields=eqtype_registry[self.eqtype]
         #perpendicular grid
         self.nx=nx
+        if ny%2==1:
+            print("ny should be even: setting ny=ny-1")
+            ny=ny-1
         self.ny=ny
         self.Lx=Lx
         self.Ly=Ly
@@ -32,6 +35,27 @@ class Parameters():
                                  #cf Pueschel et al. 2010
             self.z_diss_hyper = z_diss_hyper #currently unused, set =2
             self.z_diff_order = z_diff_order #currently unused, set =4
+        #sharding
+        n_devices = jax.device_count()
+        if self.spatial_dimensions==3:
+            devices = mesh_utils.create_device_mesh((n_devices,))
+            self.mesh = Mesh(devices, axis_names=('z_axis',))
+            self.z_spec = PartitionSpec('z_axis', None, None)
+            self.fields_spec = PartitionSpec(None,'z_axis', None, None)
+            self.grads_spec = PartitionSpec(None,None,'z_axis',None,None)
+            self.z_sharding = NamedSharding(self.mesh, self.z_spec)
+            self.fields_sharding = NamedSharding(self.mesh, self.fields_spec)
+        else:
+            self.z_spec = None
+            self.fields_spec = None
+            self.grads_spec = None
+            self.z_sharding = None
+            self.fields_sharding = None
+            if n_devices > 1:
+                print("You probably should only run a 2D run on one device, since this isn't parallelized.")
+        self.state_sharding = SimulationState(t=None,fields=self.fields_sharding)
+        
+        
 
 # registry to set the # of fields we are solving for
 eqtype_registry = {
@@ -46,18 +70,18 @@ def init_cluster():
     except (ValueError, RuntimeError):
         print(f"Running in local mode. Total devices: {jax.local_device_count()}")
 
-def setup_sharding(params):
-    #Sets up parallelization of fields along the z axis if we're in 3D.
-    n_devices = jax.device_count()
-    if params.spatial_dimensions==3:
-        devices = mesh_utils.create_device_mesh((n_devices,))
-        mesh = Mesh(devices, axis_names=('z_axis',))
-        z_sharding = NamedSharding(mesh, PartitionSpec('z_axis', None, None))
-        fields_sharding = NamedSharding(mesh, PartitionSpec(None,'z_axis', None, None))
-    else:
-        z_sharding = None
-        fields_sharding = None
-        if n_devices > 1:
-            print("You probably should only run a 2D run on one device, since this isn't parallelized.")
-    state_sharding = SimulationState(t=None,fields=fields_sharding)
-    return (z_sharding,fields_sharding,state_sharding)
+#def setup_sharding(params):
+#    #Sets up parallelization of fields along the z axis if we're in 3D.
+#    n_devices = jax.device_count()
+#    if params.spatial_dimensions==3:
+#        devices = mesh_utils.create_device_mesh((n_devices,))
+#        mesh = Mesh(devices, axis_names=('z_axis',))
+#        z_sharding = NamedSharding(mesh, PartitionSpec('z_axis', None, None))
+#        fields_sharding = NamedSharding(mesh, PartitionSpec(None,'z_axis', None, None))
+#    else:
+#        z_sharding = None
+#        fields_sharding = None
+#        if n_devices > 1:
+#            print("You probably should only run a 2D run on one device, since this isn't parallelized.")
+#    state_sharding = SimulationState(t=None,fields=fields_sharding)
+#    return (z_sharding,fields_sharding,state_sharding)
