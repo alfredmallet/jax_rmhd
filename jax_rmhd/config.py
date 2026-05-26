@@ -68,7 +68,7 @@ def init_cluster():
         jax.distributed.initialize()
         print("Distributed system initialized. Total devices: ",jax.device_count())
     except (ValueError, RuntimeError):
-        print("Running in local mode. Total devices: {}",jax.device_count())
+        print("Running in local mode. Total devices:",jax.device_count())
 
 
 #def setup_sharding(params):
