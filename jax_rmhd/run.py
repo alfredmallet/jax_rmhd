@@ -1,12 +1,31 @@
 import jax
 import jax.numpy as jnp
+from functools import partial
 from .timestepping import get_scheme
 from .snapshot_io import save_snapshot
 from time import perf_counter
 from .physics import equation_registry, construct_rhs
+from .types import SimulationState
+from .fourier import fft
 
 #debug
-from jax.debug import inspect_array_sharding
+#from jax.debug import inspect_array_sharding
+
+def initialize(func,params):
+    # use this to initialize with some known function.
+    # func should be a function that sets ALL fields in the problem, in real space.
+    # we jit this to automatically respect the sharding.
+    @partial(jax.jit,static_argnums=(0,),out_shardings=params.state_sharding)
+    def _init(f):
+        x = jnp.linspace(0, params.Lx, params.nx, endpoint=False).reshape(1,-1,1)
+        y = jnp.linspace(0, params.Ly, params.ny, endpoint=False).reshape(1,1,-1)
+        if params.spatial_dimensions==3:
+            z = jnp.linspace(0, params.Lz, params.nz, endpoint=False).reshape(-1,1,1)
+            state = SimulationState(t=0.0,fields=fft(f(x,y,z)))
+        else:
+            state = SimulationState(t=0.0,fields=fft(f(x,y)))
+        return state
+    return _init(func)        
 
 #This can be used to estimate a good nblock. You can set the minimum higher.
 def estimate_good_nblock(state,kgrid,params,t_snap,t_end,t_last_snap=0,nblock_min=10):
