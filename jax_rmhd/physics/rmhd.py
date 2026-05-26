@@ -18,7 +18,8 @@ def grad(state,kgrid,params):
 
 def set_timestep(grads,params):
     #Sets the timestep according to the CFL condition.
-    gphi,gpsi = grads[0:2]
+    gphi = grads[0]
+    gpsi = grads[1]    
     max_vy_eff = jnp.max(jnp.abs(gphi[0])+jnp.abs(gpsi[0]))
     max_vx_eff = jnp.max(jnp.abs(gphi[1])+jnp.abs(gpsi[1]))
     eps=0.1

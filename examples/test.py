@@ -1,22 +1,22 @@
 import os
+os.environ["RMHD_PRECISION"] = "64"
 import jax
 import jax_rmhd as jr
 import jax.numpy as jnp
-import jax.numpy.fft as ft
 import matplotlib.pyplot as plt
 jr.init_cluster()
 
 #parameters
-nx = 256
-ny = 256
-nz = 256
+nx = 128
+ny = 128
+nz = 128
 Lx = 2.0 * jnp.pi
 Ly = 2.0 * jnp.pi
 Lz = 2.0 * jnp.pi
 t = 0.0
 nsnap = 100
 t_snap = 100
-t_end = 0.1
+t_end = 0.01
 cfl_safety = 0.5 
 spatial_dimensions=3
 snap_path="/global/scratch/users/alfredmallet/data/test/"
@@ -43,4 +43,4 @@ nblock = jr.estimate_good_nblock(state,kgrid,params,t_snap,t_end,nblock_min=1)
 print("nblock estimate: "+str(nblock)) #not actually using this, since we just want to simulate for a fixed 100 steps
 nblock = 100
 
-end_state=jr.simulate_scan(state,kgrid,params,nblock,t_snap=t_snap,t_end=t_end,mngr=mngr)
+end_state=jr.simulate_scan(state,kgrid,params,nblock,t_snap=t_snap,t_end=t_end,mngr=mngr,save=False)

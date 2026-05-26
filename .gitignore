@@ -2,6 +2,10 @@
 data/
 examples/data
 
+#Outputs from savio runs
+*.err
+*.out
+
 #Random stray png
 *.png
 

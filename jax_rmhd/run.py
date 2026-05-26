@@ -21,9 +21,9 @@ def initialize(func,params):
         y = jnp.linspace(0, params.Ly, params.ny, endpoint=False).reshape(1,1,-1)
         if params.spatial_dimensions==3:
             z = jnp.linspace(0, params.Lz, params.nz, endpoint=False).reshape(-1,1,1)
-            state = SimulationState(t=0.0,fields=fft(f(x,y,z)))
+            state = SimulationState(t=0.0,fields=fft(f(x,y,z),params))
         else:
-            state = SimulationState(t=0.0,fields=fft(f(x,y)))
+            state = SimulationState(t=0.0,fields=fft(f(x,y),params))
         return state
     return _init(func)        
 
@@ -47,8 +47,8 @@ def block_of_steps(state,kgrid,params,nblock,scheme,stepper):
 #currently an orbax checkpoint mngr must be set outside of the simulate function
 #this makes it a little easier to set up snapshots etc but could be changed
 
-def simulate_scan(state,kgrid,params,nblock,t_snap,t_end,mngr,schemestr='lsrk33'):
-    # this simulates for a fixed number of timesteps
+def simulate_scan(state,kgrid,params,nblock,t_snap,t_end,mngr,schemestr='lsrk33',save=True):
+    # this simulates repeated fixed number of timesteps
     # for automatic differentiation sometime in the future
     # we should set nblock using the helper function estimate_good_nblock
     t_start = perf_counter()
@@ -58,22 +58,24 @@ def simulate_scan(state,kgrid,params,nblock,t_snap,t_end,mngr,schemestr='lsrk33'
                              out_shardings=(params.state_sharding,None))
     t_last_snapshot = state.t
     snap=0
-    print("Saving initial state as snapshot "+str(snap))
-    save_snapshot(snap,state,mngr)
+    if save:
+        print("Saving initial state as snapshot "+str(snap))
+        save_snapshot(snap,state,mngr)
     while state.t<t_end:
         state, _ = block_of_steps_jit(state,kgrid,params,nblock,scheme,stepper)
         print(state.t)
-        if state.t - t_last_snapshot > t_snap:
+        if state.t - t_last_snapshot > t_snap and save:
             snap=snap+1
             print("Saving snapshot "+str(snap))
             save_snapshot(snap,state,mngr)
             t_last_snapshot=state.t
     snap=snap+1
-    print("Saving final state as snapshot "+str(snap))
-    save_snapshot(snap,state,mngr)
+    if save:
+        print("Saving final state as snapshot "+str(snap))
+        save_snapshot(snap,state,mngr)
     mngr.wait_until_finished()
     t_sim = perf_counter()-t_start
-    print(f"Ending simulation at t = " + str(state.t)+". It took "+str(t_sim)+"s")
+    print("Ending simulation at t = " + str(state.t)+". It took "+str(t_sim)+"s")
     return state
 
 def simulate(initial_state,kgrid,params,t_snap,t_end,mngr,schemestr='lsrk33',save=True):
@@ -98,9 +100,7 @@ def simulate(initial_state,kgrid,params,t_snap,t_end,mngr,schemestr='lsrk33',sav
         save_snapshot(snap,state,mngr)
     while state.t<t_end:
         t_next_snapshot=min(t_last_snapshot+t_snap,t_end)
-        print("State sharding entering jit:", state.fields.sharding)
         state = sim_to_next_snap_jit(state,t_next_snapshot)
-        print("State sharding exiting jit:", state.fields.sharding)
         snap=snap+1
         if save:
             print ("Saving snapshot "+str(snap)+ " at t = "+str(state.t))

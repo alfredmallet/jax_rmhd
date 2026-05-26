@@ -66,9 +66,10 @@ def init_cluster():
     # This should be called first when running on more than 1 node. It is optional otherwise.
     try:
         jax.distributed.initialize()
-        print(f"Distributed system initialized. Total devices: {jax.device_count()}")
+        print("Distributed system initialized. Total devices: ",jax.device_count())
     except (ValueError, RuntimeError):
-        print(f"Running in local mode. Total devices: {jax.local_device_count()}")
+        print("Running in local mode. Total devices: {}",jax.device_count())
+
 
 #def setup_sharding(params):
 #    #Sets up parallelization of fields along the z axis if we're in 3D.
