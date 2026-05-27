@@ -6,8 +6,8 @@
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=32        
 #SBATCH --time=00:30:00           
-#SBATCH --output=auto.out
-#SBATCH --error=auto.err
+#SBATCH --output=auto%j.out
+#SBATCH --error=auto%j.err
 
 module purge
 module load anaconda3

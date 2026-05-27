@@ -1,5 +1,4 @@
 import os
-os.environ["XLA_FLAGS"] = "--xla_force_host_platform_device_count=4"
 import jax
 import jax_rmhd as jr
 import jax.numpy as jnp
@@ -44,4 +43,4 @@ nblock = jr.estimate_good_nblock(state,kgrid,params,t_snap,t_end,nblock_min=1)
 print("nblock estimate: "+str(nblock)) #not actually using this, since we just want to simulate for a fixed 100 steps
 nblock = 100
 
-end_state=jr.simulate_scan(state,kgrid,params,nblock,t_snap=t_snap,t_end=t_end,mngr=mngr,save=False)
+end_state=jr.simulate_scan(state,kgrid,params,nblock,t_snap=t_snap,t_end=t_end,mngr=mngr,save=True)

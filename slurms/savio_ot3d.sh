@@ -6,8 +6,8 @@
 #SBATCH --ntasks-per-node=32
 #SBATCH --cpus-per-task=1     
 #SBATCH --time=00:30:00           
-#SBATCH --output=expl%j.out
-#SBATCH --error=expl%j.err
+#SBATCH --output=ot3d%j.out
+#SBATCH --error=ot3d%j.err
 #SBATCH --mem=0
 
 module purge
@@ -23,4 +23,4 @@ export OPENBLAS_NUM_THREADS=1
 export MKL_NUM_THREADS=1
 export NUMEXPR_NUM_THREADS=1
 
-time srun python -u /global/home/users/alfredmallet/jax_rmhd/examples/test.py
+time srun python -u /global/home/users/alfredmallet/jax_rmhd/examples/savio_ot3d.py
