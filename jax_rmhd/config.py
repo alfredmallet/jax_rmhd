@@ -45,6 +45,7 @@ class Parameters():
             self.grads_spec = PartitionSpec(None,None,'z_axis',None,None)
             self.z_sharding = NamedSharding(self.mesh, self.z_spec)
             self.fields_sharding = NamedSharding(self.mesh, self.fields_spec)
+            self.t_sharding = NamedSharding(self.mesh,PartitionSpec())
         else:
             self.z_spec = None
             self.fields_spec = None
@@ -53,7 +54,7 @@ class Parameters():
             self.fields_sharding = None
             if n_devices > 1:
                 print("You probably should only run a 2D run on one device, since this isn't parallelized.")
-        self.state_sharding = SimulationState(t=None,fields=self.fields_sharding)
+        self.state_sharding = SimulationState(t=self.t_sharding,fields=self.fields_sharding)
         
         
 
