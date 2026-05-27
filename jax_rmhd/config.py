@@ -5,7 +5,7 @@ from .types import SimulationState
 
 class Parameters():
     #Stores all static parameters for the problem
-    def __init__(self,nx,ny,Lx,Ly,diss,hyper,cfl_safety,dims=2,nz=0,Lz=0.0,z_diss=0.25,z_diss_hyper=2.0,z_diff_order=4,eqtype="RMHD"):
+    def __init__(self,nx,ny,Lx,Ly,diss,hyper,cfl_safety,dt=0.1,adaptive_timestep=True,dims=2,nz=0,Lz=0.0,z_diss=0.25,z_diss_hyper=2.0,z_diff_order=4,eqtype="RMHD"):
         self.eqtype=eqtype
         self.nfields=eqtype_registry[self.eqtype]
         #perpendicular grid
@@ -23,6 +23,8 @@ class Parameters():
         self.hyper=hyper
         #timestepping
         self.cfl_safety=cfl_safety
+        self.dt = dt # Only used if adaptive_timestep==False
+        self.adaptive_timestep = adaptive_timestep #Usually we want this to be true
         #dimensions
         self.spatial_dimensions=dims
         if dims==3:
