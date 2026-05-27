@@ -1,7 +1,7 @@
 import jax
 import jax.numpy as jnp
-import orbax.checkpoint as ocp
 import tensorstore as ts
+import orbax.checkpoint as ocp
 import os
 from .types import SimulationState
 
@@ -14,11 +14,15 @@ def get_precision_types():
 # Setting up Orbax stuff
 def snapshot_manager_setup(snap_path="data",nsnap=1000):
     checkpoint_path = os.path.abspath(snap_path)
-    options = ocp.CheckpointManagerOptions(max_to_keep=nsnap, create=True)
-    return ocp.CheckpointManager(checkpoint_path,ocp.StandardCheckpointer(),options=options)
+    options = ocp.CheckpointManagerOptions()
+    return ocp.CheckpointManager(directory=checkpoint_path,options=options)
 
 def save_snapshot(isnap,state,mngr):
-    return mngr.save(isnap, args=ocp.args.StandardSave(state), metrics={"time": float(state.t)})
+    return mngr.save(isnap,args=ocp.args.StandardSave(state))
+
+#v0 orbax version
+#def save_snapshot(isnap,state,mngr):
+#    return mngr.save(isnap, args=ocp.args.StandardSave(state), metrics={"time": float(state.t)})
 
 def load_snapshot(isnap,mngr,params):
     #This will load the whole snapshot into memory; on a cluster it should work in a distributed way.
@@ -29,8 +33,7 @@ def load_snapshot(isnap,mngr,params):
     ftype, ctype = get_precision_types()
     fields_like = jax.ShapeDtypeStruct(shape_complex, ctype,sharding=params.fields_sharding)
     state_like = SimulationState(t=jax.ShapeDtypeStruct((), ftype), fields=fields_like)
-    restore_args =  ocp.args.StandardRestore(state_like)
-    return mngr.restore(isnap, args=restore_args)
+    return mngr.restore(isnap,args=ocp.args.StandardRestore(state_like))
 
 def find_items(isnap,snap_path):
     db_path=os.path.join(snap_path, str(isnap), "default")

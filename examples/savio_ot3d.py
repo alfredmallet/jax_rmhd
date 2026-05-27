@@ -1,5 +1,4 @@
 import os
-os.environ["XLA_FLAGS"] = "--xla_force_host_platform_device_count=4"
 import jax
 import jax_rmhd as jr
 import jax.numpy as jnp
