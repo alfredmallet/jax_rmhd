@@ -5,7 +5,7 @@ from .types import SimulationState
 
 class Parameters():
     #Stores all static parameters for the problem
-    def __init__(self,nx,ny,Lx,Ly,diss,hyper,cfl_safety,dims=2,nz=0,Lz=0.0,z_diss=0.25,z_diss_hyper=2.0,z_diff_order=4,eqtype="RMHD"):
+    def __init__(self,nx,ny,Lx,Ly,diss,hyper,cfl_safety,dt=0.1,adaptive_timestep=True,dims=2,nz=0,Lz=0.0,z_diss=0.25,z_diss_hyper=2.0,z_diff_order=4,eqtype="RMHD"):
         self.eqtype=eqtype
         self.nfields=eqtype_registry[self.eqtype]
         #perpendicular grid
@@ -23,6 +23,8 @@ class Parameters():
         self.hyper=hyper
         #timestepping
         self.cfl_safety=cfl_safety
+        self.dt = dt # Only used if adaptive_timestep==False
+        self.adaptive_timestep = adaptive_timestep #Usually we want this to be true
         #dimensions
         self.spatial_dimensions=dims
         if dims==3:
@@ -45,6 +47,8 @@ class Parameters():
             self.grads_spec = PartitionSpec(None,None,'z_axis',None,None)
             self.z_sharding = NamedSharding(self.mesh, self.z_spec)
             self.fields_sharding = NamedSharding(self.mesh, self.fields_spec)
+            #t is replicated across the mesh
+            self.t_sharding = NamedSharding(self.mesh,PartitionSpec())
         else:
             self.z_spec = None
             self.fields_spec = None
@@ -53,7 +57,7 @@ class Parameters():
             self.fields_sharding = None
             if n_devices > 1:
                 print("You probably should only run a 2D run on one device, since this isn't parallelized.")
-        self.state_sharding = SimulationState(t=None,fields=self.fields_sharding)
+        self.state_sharding = SimulationState(t=self.t_sharding,fields=self.fields_sharding)
         
         
 

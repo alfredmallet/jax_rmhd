@@ -15,7 +15,10 @@ def rk_advance(state,kgrid,params,rhs,set_timestep,scheme=None):
     #print("---COMPILING rk_advance---") #add this back in to check that jit is working properly
     #RK4 substep 1
     k1, grads = rhs(state,kgrid,params)
-    dt=set_timestep(grads,params)
+    if params.adaptive_timestep==True:
+        dt = set_timestep(grads,params)
+    else:
+        dt = params.dt
     #dissipation factors 
     diss_full = jnp.exp(kgrid.hdiss_exponents(params)*dt)
     diss_half = jnp.exp(kgrid.hdiss_exponents(params)*dt/2)
@@ -50,7 +53,10 @@ def lsrk_advance(state, kgrid, params, rhs, set_timestep, scheme):
     gammas_arr = jnp.array(scheme.gammas)
 
     init_rhs,grads = rhs(state,kgrid,params)
-    dt = set_timestep(grads,params)
+    if params.adaptive_timestep==True:
+        dt = set_timestep(grads,params)
+    else:
+        dt = params.dt
 
     diss_exponents = kgrid.hdiss_exponents(params) * dt
 
