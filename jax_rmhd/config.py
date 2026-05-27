@@ -45,6 +45,7 @@ class Parameters():
             self.grads_spec = PartitionSpec(None,None,'z_axis',None,None)
             self.z_sharding = NamedSharding(self.mesh, self.z_spec)
             self.fields_sharding = NamedSharding(self.mesh, self.fields_spec)
+            #t is replicated across the mesh
             self.t_sharding = NamedSharding(self.mesh,PartitionSpec())
         else:
             self.z_spec = None

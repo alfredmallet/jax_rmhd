@@ -33,9 +33,7 @@ def load_snapshot(isnap,mngr,params):
         shape_complex = (params.nx, params.ny // 2 + 1)
     ftype, ctype = get_precision_types()
     fields_like = jax.ShapeDtypeStruct(shape_complex, ctype,sharding=params.fields_sharding)
-    # t is replicated across the mesh: we need to specify this explicitly here.
-    t_sharding = NamedSharding(params.mesh, PartitionSpec())
-    state_like = SimulationState(t=jax.ShapeDtypeStruct((), ftype,sharding=t_sharding), fields=fields_like)
+    state_like = SimulationState(t=jax.ShapeDtypeStruct((), ftype,sharding=params.t_sharding), fields=fields_like)
     return mngr.restore(isnap,args=ocp.args.StandardRestore(state_like))
 
 def find_items(isnap,snap_path):
