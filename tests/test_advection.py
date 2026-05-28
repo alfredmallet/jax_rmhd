@@ -1,4 +1,5 @@
 import os
+os.environ["RMHD_PRECISION"] = "64"
 import jax
 import jax_rmhd as jr
 import jax.numpy as jnp
@@ -15,11 +16,11 @@ Lz = 2.0 * jnp.pi
 t = 0.0
 nsnap = 100
 t_snap = 10.0
-t_end = 10.0
+t_end = 0.1
 cfl_safety = 0.5 
 spatial_dimensions=3
-nblock=100
-snap_path="/global/scratch/users/alfredmallet/data/ot3d"
+nblock=6000
+snap_path="test_advection/"
 
 visc=0.0
 res=0.0
@@ -36,7 +37,7 @@ def init_fields(x,y,z):
 
 
 # vary nz, fix dt
-dt=0.1
+dt=0.001
 nz_list=[32,64,128,256,512]
 if is_control:
     l1err=[]
@@ -51,16 +52,18 @@ for nz in nz_list:
         psi = phi # z+ wave propagates backwards at vA=1
         return jnp.stack([phi,psi],axis=0)
     end_exact=jr.initialize(end_fields,params)
-    local_err1=jnp.sum(jnp.abs(end_state.fields-end_exact.fields))
-    local_denom1=jnp.sum(jnp.abs(end_exact.fields))
-    local_err2=jnp.sum((end_state.fields-end_exact.fields)**2)
-    local_denom2=jnp.sum(end_exact.fields**2)
-    err1=jax.lax.psum(local_err1,axis_name=None)
-    denom1=jax.lax.psum(local_denom1,axis_name=None)
-    err2=jnp.sqrt(jax.lax.psum(local_err2,axis_name=None))
-    denom2=jnp.sqrt(jax.lax.psum(local_denom2,axis_name=None))
-    rel1=err1/denom1
-    rel2=err2/denom2
+    local_err1=float(jnp.sum(jnp.abs(end_state.fields-end_exact.fields)))
+    local_denom1=float(jnp.sum(jnp.abs(end_exact.fields)))
+    local_err2=float(jnp.sum(jnp.abs((end_state.fields-end_exact.fields))**2))
+    local_denom2=float(jnp.sum(jnp.abs(end_exact.fields)**2))
+    err1 = jnp.sum(jax.experimental.multihost_utils.process_allgather(local_err1))
+    denom1 = jnp.sum(jax.experimental.multihost_utils.process_allgather(local_denom1))
+    err2_sq = jnp.sum(jax.experimental.multihost_utils.process_allgather(local_err2))
+    denom2_sq = jnp.sum(jax.experimental.multihost_utils.process_allgather(local_denom2))
+    err2 = jnp.sqrt(err2_sq)
+    denom2 = jnp.sqrt(denom2_sq)
+    rel1 = err1 / denom1
+    rel2 = err2 / denom2
     if is_control:
         r1=float(rel1)
         r2=float(rel2)
@@ -69,11 +72,14 @@ for nz in nz_list:
         print("nz: ",nz, ", L1 Relative Error: ", r1, ", L2 Relative Error: ", r2)
 
 if is_control:
-    jnp.savez(snap_path+"/"+"nz_test.npz",nz=nz_list,l1=l1err,l2=l2err)
+    jnp.savez(snap_path+"nz_test.npz",nz=nz_list,l1=l1err,l2=l2err)
 
 
-plt.figure(1)
-plt.loglog(nz_list,l1err)
-plt.loglog(nz_list,l2err)
-plt.loglog(nz_list,nz_list**-4.0)
-plt.savefig("nz_test_advection.png")
+    plt.figure(1)
+    plt.loglog(nz_list,l1err,label='L1')
+    plt.loglog(nz_list,l2err,label='L2')
+    plt.loglog(nz_list,jnp.array(nz_list)**-4.0,label='-4')
+    plt.xlabel(r'$n_z$')
+    plt.ylabel('relative error')
+    plt.legend()
+    plt.savefig(snap_path+"nz_test_advection.png")
