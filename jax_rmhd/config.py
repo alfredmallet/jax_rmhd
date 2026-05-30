@@ -50,11 +50,14 @@ class Parameters():
             #t is replicated across the mesh
             self.t_sharding = NamedSharding(self.mesh,PartitionSpec())
         else:
+            #devices = mesh_utils.create_device_mesh((n_devices,))
+            #self.mesh = Mesh(devices,axis_names=('dummy',))
             self.z_spec = None
             self.fields_spec = None
             self.grads_spec = None
             self.z_sharding = None
             self.fields_sharding = None
+            self.t_sharding = None
             if n_devices > 1:
                 print("You probably should only run a 2D run on one device, since this isn't parallelized.")
         self.state_sharding = SimulationState(t=self.t_sharding,fields=self.fields_sharding)

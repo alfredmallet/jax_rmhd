@@ -20,7 +20,7 @@ t_end = 0.1
 cfl_safety = 0.5 
 spatial_dimensions=3
 nblock=6000
-snap_path="test_advection/"
+snap_path="data/test_advection/"
 
 visc=0.0
 res=0.0
@@ -43,7 +43,8 @@ if is_control:
     l1err=[]
     l2err=[]
 for nz in nz_list:
-    params=jr.Parameters(nx=nx,ny=ny,nz=nz,Lx=Lx,Ly=Ly,Lz=Lz,diss=(visc,res),hyper=hyper,cfl_safety=cfl_safety,dt=dt,adaptive_timestep=False,dims=spatial_dimensions)
+    params=jr.Parameters(nx=nx,ny=ny,nz=nz,Lx=Lx,Ly=Ly,Lz=Lz,diss=(visc,res),
+                         hyper=hyper,cfl_safety=cfl_safety,dt=dt,adaptive_timestep=False,dims=spatial_dimensions)
     kgrid = jr.setup_kgrids(params)
     state=jr.initialize(init_fields,params)
     end_state=jr.simulate_scan(state,kgrid,params,nblock,t_snap,t_end,mngr,save=False)
