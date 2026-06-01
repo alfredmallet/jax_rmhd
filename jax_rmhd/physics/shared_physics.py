@@ -16,9 +16,9 @@ def z_derivatives(f,params):
     dz=params.dz
     send_left = f[:,:2,:,:]
     send_right = f[:,-2:,:,:]
-    recv_right, _ = mpi4jax.sendrecv(send_left, dest=params.left_neighbor, source=params.right_neighbor,
+    recv_right = mpi4jax.sendrecv(send_left, send_left, dest=params.left_neighbor, source=params.right_neighbor,
                                      comm=params.cart_comm, sendtag=101, recvtag=101)
-    recv_left, _ = mpi4jax.sendrecv(send_right, dest=params.right_neighbor, source=params.left_neighbor,
+    recv_left = mpi4jax.sendrecv(send_right, send_right, dest=params.right_neighbor, source=params.left_neighbor,
                                     comm=params.cart_comm, sendtag=102, recvtag=102)
     f_padded = jnp.concatenate([recv_left,f,recv_right],axis=1)
     p2 = f_padded[:,4:,:,:]

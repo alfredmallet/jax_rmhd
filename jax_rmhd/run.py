@@ -19,9 +19,9 @@ def initialize(func,params):
             nz_device = params.nz//params.size
             idx_device = params.rank * nz_device + jnp.arange(nz_device)
             z_device = (idx_device * params.dz).reshape(-1,1,1)
-            state = SimulationState(t=0.0,fields=fft(f(x,y,z_device),params))
+            state = SimulationState(t=0.0,fields=fft(f(x,y,z_device)))
         else:
-            state = SimulationState(t=0.0,fields=fft(f(x,y),params))
+            state = SimulationState(t=0.0,fields=fft(f(x,y)))
         return state
     return _init(func)        
 

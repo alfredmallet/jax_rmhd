@@ -1,6 +1,7 @@
 import jax.numpy as jnp
 from .. import fourier
 from .shared_physics import gradk,bracket,z_derivatives
+from mpi4py import MPI
 import mpi4jax
 
 def grad(state,kgrid,params):
@@ -27,7 +28,7 @@ def set_timestep(grads,params):
         max_all = jnp.maximum(max_all,params.z_diss)
 
     if params.cart_comm is not None:
-        max_all,_ = mpi4jax.allreduce(max_all,op=mpi4jax.MPI.MAX,comm=params.cart_comm)
+        max_all = mpi4jax.allreduce(max_all,op=MPI.MAX,comm=params.cart_comm)
     return params.cfl_safety / max_all
 
 def NonlinearTerm(state,grads,kgrid,params):
