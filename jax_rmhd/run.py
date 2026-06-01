@@ -8,20 +8,18 @@ from .physics import equation_registry, construct_rhs
 from .types import SimulationState
 from .fourier import fft
 
-#debug
-#from jax.debug import inspect_array_sharding
-
 def initialize(func,params):
     # use this to initialize with some known function.
     # func should be a function that sets ALL fields in the problem, in real space.
-    # we jit this to automatically respect the sharding.
-    @partial(jax.jit,static_argnums=(0,),out_shardings=params.state_sharding)
+    @partial(jax.jit,static_argnums=(0,))
     def _init(f):
         x = jnp.linspace(0, params.Lx, params.nx, endpoint=False).reshape(1,-1,1)
         y = jnp.linspace(0, params.Ly, params.ny, endpoint=False).reshape(1,1,-1)
         if params.spatial_dimensions==3:
-            z = jnp.linspace(0, params.Lz, params.nz, endpoint=False).reshape(-1,1,1)
-            state = SimulationState(t=0.0,fields=fft(f(x,y,z),params))
+            nz_device = params.nz//params.size
+            idx_device = params.rank * nz_device + jnp.arange(nz_device)
+            z_device = (idx_device * params.dz).reshape(-1,1,1)
+            state = SimulationState(t=0.0,fields=fft(f(x,y,z_device),params))
         else:
             state = SimulationState(t=0.0,fields=fft(f(x,y),params))
         return state
@@ -53,29 +51,31 @@ def simulate_scan(state,kgrid,params,nblock,t_snap,t_end,mngr,schemestr='lsrk33'
     # we should set nblock using the helper function estimate_good_nblock
     t_start = perf_counter()
     stepper,scheme = get_scheme(schemestr)
-    block_of_steps_jit = jax.jit(block_of_steps,static_argnums=(2,3,4,5),
-                           in_shardings=(params.state_sharding, None),
-                             out_shardings=(params.state_sharding,None))
+    block_of_steps_jit = jax.jit(block_of_steps,static_argnums=(2,3,4,5))
     t_last_snapshot = state.t
     snap=0
     if save:
-        print("Saving initial state as snapshot "+str(snap))
+        if params.rank==0:
+            print("Saving initial state as snapshot "+str(snap))
         save_snapshot(snap,state,mngr)
     while state.t<t_end:
         state, _ = block_of_steps_jit(state,kgrid,params,nblock,scheme,stepper)
         print(state.t)
         if state.t - t_last_snapshot > t_snap and save:
             snap=snap+1
-            print("Saving snapshot "+str(snap))
+            if params.rank==0:
+                print("Saving snapshot "+str(snap))
             save_snapshot(snap,state,mngr)
             t_last_snapshot=state.t
     snap=snap+1
     if save:
-        print("Saving final state as snapshot "+str(snap))
+        if params.rank==0:
+            print("Saving final state as snapshot "+str(snap))
         save_snapshot(snap,state,mngr)
     mngr.wait_until_finished()
     t_sim = perf_counter()-t_start
-    print("Ending simulation at t = " + str(state.t)+". It took "+str(t_sim)+"s")
+    if params.rank==0:
+        print("Ending simulation at t = " + str(state.t)+". It took "+str(t_sim)+"s")
     return state
 
 def simulate(initial_state,kgrid,params,t_snap,t_end,mngr,schemestr='lsrk33',save=True):
@@ -89,25 +89,26 @@ def simulate(initial_state,kgrid,params,t_snap,t_end,mngr,schemestr='lsrk33',sav
         def snap_cond(state):
             return state.t<target_t
         return jax.lax.while_loop(snap_cond,stepper_wrapped,state)
-    sim_to_next_snap_jit = jax.jit(sim_to_next_snap,
-                                   in_shardings=(params.state_sharding,None),
-                                   out_shardings=params.state_sharding)
+    sim_to_next_snap_jit = jax.jit(sim_to_next_snap)
     state=initial_state
     t_last_snapshot = state.t
     snap=0
-    if save:   
-        print("Saving initial state as snapshot "+str(snap))
+    if save: 
+        if params.rank==0:  
+            print("Saving initial state as snapshot "+str(snap))
         save_snapshot(snap,state,mngr)
     while state.t<t_end:
         t_next_snapshot=min(t_last_snapshot+t_snap,t_end)
         state = sim_to_next_snap_jit(state,t_next_snapshot)
         snap=snap+1
         if save:
-            print ("Saving snapshot "+str(snap)+ " at t = "+str(state.t))
+            if params.rank==0:
+                print ("Saving snapshot "+str(snap)+ " at t = "+str(state.t))
             save_snapshot(snap,state,mngr)
             t_last_snapshot=state.t
     mngr.wait_until_finished()
     t_sim = perf_counter()-t_start
-    print(f"Ending simulation at t = "+str(state.t)+". It took "+str(t_sim)+"s")
+    if params.rank==0:
+        print(f"Ending simulation at t = "+str(state.t)+". It took "+str(t_sim)+"s")
     return state
 

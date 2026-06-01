@@ -5,10 +5,10 @@ precision = os.environ.get("RMHD_PRECISION","32")
 
 if precision == "64":
     jax.config.update("jax_enable_x64", True)
-    print("rmhd-solver has initialized jax in 64bit precision.")
+    print("jax is using 64bit precision.")
 else:
     jax.config.update("jax_enable_x64", False)
-    print("rmhd-solver has initialized jax in 32bit precision.")
+    print("jax is using 32bit precision.")
 
 from .types import SimulationState
 from .fourier import K_Grids, setup_kgrids

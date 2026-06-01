@@ -1,8 +1,9 @@
+from mpi4py import MPI
 import jax
-from jax.sharding import Mesh, PartitionSpec, NamedSharding
-from jax.experimental import mesh_utils
+from jax.tree_util import register_pytree_node_class
 from .types import SimulationState
 
+@register_pytree_node_class
 class Parameters():
     #Stores all static parameters for the problem
     def __init__(self,nx,ny,Lx,Ly,diss,hyper,cfl_safety,dt=0.1,adaptive_timestep=True,dims=2,nz=0,Lz=0.0,z_diss=0.25,z_diss_hyper=2.0,z_diff_order=4,eqtype="RMHD"):
@@ -37,31 +38,28 @@ class Parameters():
                                  #cf Pueschel et al. 2010
             self.z_diss_hyper = z_diss_hyper #currently unused, set =2
             self.z_diff_order = z_diff_order #currently unused, set =4
-        #sharding
-        n_devices = jax.device_count()
+        #MPI
+        self.comm=MPI.COMM_WORLD
+        self.rank=self.comm.Get_rank()
+        self.size=self.comm.Get_size()
         if self.spatial_dimensions==3:
-            devices = mesh_utils.create_device_mesh((n_devices,))
-            self.mesh = Mesh(devices, axis_names=('z_axis',))
-            self.z_spec = PartitionSpec('z_axis', None, None)
-            self.fields_spec = PartitionSpec(None,'z_axis', None, None)
-            self.grads_spec = PartitionSpec(None,None,'z_axis',None,None)
-            self.z_sharding = NamedSharding(self.mesh, self.z_spec)
-            self.fields_sharding = NamedSharding(self.mesh, self.fields_spec)
-            #t is replicated across the mesh
-            self.t_sharding = NamedSharding(self.mesh,PartitionSpec())
+            self.cart_comm = self.comm.Create_cart(dims=[self.size],periods=[True],reorder=False)
+            self.left_neighbor, self.right_neighbor = self.cart_comm.Shift(direction=0, disp=1)
         else:
-            #devices = mesh_utils.create_device_mesh((n_devices,))
-            #self.mesh = Mesh(devices,axis_names=('dummy',))
-            self.z_spec = None
-            self.fields_spec = None
-            self.grads_spec = None
-            self.z_sharding = None
-            self.fields_sharding = None
-            self.t_sharding = None
-            if n_devices > 1:
+            self.cart_comm = None
+            self.left_neighbor = None
+            self.right_neighbor = None
+            if self.size > 1 and self.rank==0:
                 print("You probably should only run a 2D run on one device, since this isn't parallelized.")
-        self.state_sharding = SimulationState(t=self.t_sharding,fields=self.fields_sharding)
-        
+    def tree_flatten(self):
+        children = ()
+        param_data = {k: v for k, v in self.__dict__.items()}
+        return (children, param_data)
+    @classmethod
+    def tree_unflatten(cls,param_data,children):
+        obj = cls.__new__(cls)
+        obj.__dict__.update(param_data)
+        return obj
         
 
 # registry to set the # of fields we are solving for
@@ -70,26 +68,13 @@ eqtype_registry = {
 }
 
 def init_cluster():
-    # This should be called first when running on more than 1 node. It is optional otherwise.
     try:
         jax.distributed.initialize()
-        print("Distributed system initialized. Total devices: ",jax.device_count())
+        comm=MPI.COMM_WORLD
+        if comm.Get_rank()==0:
+            print("Distributed system initialized. Total devices: ",jax.device_count())
     except (ValueError, RuntimeError):
-        print("Running in local mode. Total devices:",jax.device_count())
+        comm = MPI.COMM_WORLD
+        if comm.Get_size() == 1:
+            jax.distributed.initialize(coordinator_address="localhost:8888", num_processes=1, process_id=0, local_device_ids=0)
 
-
-#def setup_sharding(params):
-#    #Sets up parallelization of fields along the z axis if we're in 3D.
-#    n_devices = jax.device_count()
-#    if params.spatial_dimensions==3:
-#        devices = mesh_utils.create_device_mesh((n_devices,))
-#        mesh = Mesh(devices, axis_names=('z_axis',))
-#        z_sharding = NamedSharding(mesh, PartitionSpec('z_axis', None, None))
-#        fields_sharding = NamedSharding(mesh, PartitionSpec(None,'z_axis', None, None))
-#    else:
-#        z_sharding = None
-#        fields_sharding = None
-#        if n_devices > 1:
-#            print("You probably should only run a 2D run on one device, since this isn't parallelized.")
-#    state_sharding = SimulationState(t=None,fields=fields_sharding)
-#    return (z_sharding,fields_sharding,state_sharding)

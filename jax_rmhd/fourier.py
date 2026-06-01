@@ -31,30 +31,8 @@ def setup_kgrids(params):
     ky_grid = ky.reshape(1, -1)
     return K_Grids(kx=kx_grid, ky=ky_grid)
 
-def fft(f,params):
-    if params.spatial_dimensions==3:
-        @jax.shard_map(mesh=params.mesh,in_specs=params.fields_spec,out_specs=params.fields_spec)
-        def fft_local(f):
-            return ft.rfft2(f,axes=(-2,-1))
-        return fft_local(f)
-    else:
-        return ft.rfft2(f,axes=(-2,-1))
+def fft(f):
+    return ft.rfft2(f,axes=(-2,-1))
 
 def ifft(f,params):
-    if params.spatial_dimensions==3:
-        @jax.shard_map(mesh=params.mesh,in_specs=params.fields_spec,out_specs=params.fields_spec)
-        def ifft_local(f):
-            return ft.irfft2(f,s=(params.nx,params.ny),axes=(-2,-1))
-        return ifft_local(f)
-    else:
-        return ft.irfft2(f,s=(params.nx,params.ny),axes=(-2,-1))
-
-#because of shardings we need another ifft for gradient arrays
-def ifft_g(g,params):
-    if params.spatial_dimensions==3:
-        @jax.shard_map(mesh=params.mesh,in_specs=params.grads_spec,out_specs=params.grads_spec)
-        def ifft_local(g):
-            return ft.irfft2(g,s=(params.nx,params.ny),axes=(-2,-1))
-        return ifft_local(g)
-    else:
-        return ft.irfft2(g,s=(params.nx,params.ny),axes=(-2,-1))
+    return ft.irfft2(f,s=(params.nx,params.ny),axes=(-2,-1))

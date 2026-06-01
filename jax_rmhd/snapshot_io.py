@@ -4,7 +4,6 @@ import tensorstore as ts
 import orbax.checkpoint as ocp
 import os
 from .types import SimulationState
-from jax.sharding import Mesh, PartitionSpec, NamedSharding
 
 def get_precision_types():
     if jax.config.read("jax_enable_x64"):
@@ -28,12 +27,13 @@ def save_snapshot(isnap,state,mngr):
 def load_snapshot(isnap,mngr,params):
     #This will load the whole snapshot into memory; respects the shardings specified in params
     if params.spatial_dimensions==3:
-        shape_complex = (params.nfields,params.nz, params.nx, params.ny // 2 + 1)
+        nz_device = params.nz // params.size
+        shape_complex = (params.nfields, nz_device, params.nx, params.ny // 2 + 1)
     else:
-        shape_complex = (params.nx, params.ny // 2 + 1)
+        shape_complex = (params.nfields, params.nx, params.ny // 2 + 1)
     ftype, ctype = get_precision_types()
-    fields_like = jax.ShapeDtypeStruct(shape_complex, ctype,sharding=params.fields_sharding)
-    state_like = SimulationState(t=jax.ShapeDtypeStruct((), ftype,sharding=params.t_sharding), fields=fields_like)
+    fields_like = jax.ShapeDtypeStruct(shape_complex, ctype)
+    state_like = SimulationState(t=jax.ShapeDtypeStruct((), ftype), fields=fields_like)
     return mngr.restore(isnap,args=ocp.args.StandardRestore(state_like))
 
 def find_items(isnap,snap_path):

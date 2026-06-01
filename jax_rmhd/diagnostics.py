@@ -3,6 +3,12 @@ import jax.numpy as jnp
 from . import fourier
 import jax.numpy.fft as ft
 
+#
+#
+# THESE ARE LIKELY BROKEN! NEED TO FIX
+#
+#
+
 def perpspec(state,kgrid,params,bin_factor=2.0):
     phik=state.fields.phik
     psik=state.fields.psik
