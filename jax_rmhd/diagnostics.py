@@ -10,16 +10,15 @@ import jax.numpy.fft as ft
 #
 
 def perpspec(state,kgrid,params,bin_factor=2.0):
-    phik=state.fields.phik
-    psik=state.fields.psik
+    phik=state.fields[0]
+    psik=state.fields[1]
     rfft2_y_factor = jnp.full(phik.shape[-1],2.0)
     rfft2_y_factor = rfft2_y_factor.at[0].set(1.0)
     rfft2_y_factor = rfft2_y_factor.at[-1].set(1.0)
     energy_u = 0.5 * kgrid.ksq() * jnp.abs(phik)**2.0 * rfft2_y_factor
     energy_b = 0.5 * kgrid.ksq() * jnp.abs(psik)**2.0 * rfft2_y_factor
-    if params.spatial_dimensions==3:
-        energy_u = jnp.sum(energy_u,axis=0)/params.nz
-        energy_b = jnp.sum(energy_b,axis=0)/params.nz
+    energy_u = jnp.sum(energy_u,axis=0)/params.nz
+    energy_b = jnp.sum(energy_b,axis=0)/params.nz
     kunit = min(2 * jnp.pi / params.Lx, 2 * jnp.pi / params.Ly)
     kmax = min(params.nx//2,params.ny//2)*kunit
     dk=kunit*bin_factor
@@ -27,8 +26,7 @@ def perpspec(state,kgrid,params,bin_factor=2.0):
     norm = 1 / float(params.nx*params.ny)**2
     spec_u, _ = jnp.histogram(jnp.sqrt(kgrid.ksq()),bins=bin_edges,weights=energy_u*norm/dk)
     spec_b, _ = jnp.histogram(jnp.sqrt(kgrid.ksq()),bins=bin_edges,weights=energy_b*norm/dk)
-    #spec_u, _ = jnp.histogram(jnp.sqrt(kgrid.ksq()),bins=bins,weights=energy_u*norm)
-    #spec_b, _ = jnp.histogram(jnp.sqrt(kgrid.ksq()),bins=bins,weights=energy_b*norm)
+
     bin_centers=(bin_edges[1:] + bin_edges[:-1]) / 2
     return bin_centers,spec_u,spec_b
 

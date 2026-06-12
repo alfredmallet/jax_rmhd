@@ -25,6 +25,8 @@ class K_Grids(NamedTuple):
 
 def setup_kgrids(params):
     # Gets the wavenumber grid object from parameters.
+    # The scaling here respects jax.numpy's fourier transform conventions
+    # so that e.g. we can calculate derivatives correctly.
     kx = ft.fftfreq(params.nx) * params.nx * 2 * jnp.pi / params.Lx
     ky = ft.rfftfreq(params.ny) * params.ny * 2 * jnp.pi / params.Ly
     kx_grid = kx.reshape(-1, 1)

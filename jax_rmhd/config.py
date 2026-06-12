@@ -38,6 +38,8 @@ class Parameters():
                                  #cf Pueschel et al. 2010
             self.z_diss_hyper = z_diss_hyper #currently unused, set =2
             self.z_diff_order = z_diff_order #currently unused, set =4
+        else:
+            self.nz=1
         #MPI
         self.comm=MPI.COMM_WORLD
         self.rank=self.comm.Get_rank()

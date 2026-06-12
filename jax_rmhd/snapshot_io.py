@@ -20,17 +20,13 @@ def snapshot_manager_setup(snap_path="data",nsnap=1000):
 def save_snapshot(isnap,state,mngr):
     return mngr.save(isnap,args=ocp.args.StandardSave(state))
 
-#v0 orbax version
-#def save_snapshot(isnap,state,mngr):
-#    return mngr.save(isnap, args=ocp.args.StandardSave(state), metrics={"time": float(state.t)})
-
 def load_snapshot(isnap,mngr,params):
     #This will load the whole snapshot into memory; respects the shardings specified in params
     if params.spatial_dimensions==3:
         nz_device = params.nz // params.size
         shape_complex = (params.nfields, nz_device, params.nx, params.ny // 2 + 1)
     else:
-        shape_complex = (params.nfields, params.nx, params.ny // 2 + 1)
+        shape_complex = (params.nfields, 1, params.nx, params.ny // 2 + 1)
     ftype, ctype = get_precision_types()
     fields_like = jax.ShapeDtypeStruct(shape_complex, ctype)
     state_like = SimulationState(t=jax.ShapeDtypeStruct((), ftype), fields=fields_like)
