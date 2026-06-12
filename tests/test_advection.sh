@@ -1,13 +1,13 @@
 #!/bin/bash
-#SBATCH --job-name=expl
+#SBATCH --job-name=test_advection
 #SBATCH --account=fc_kawturb  
 #SBATCH --partition=savio3       
 #SBATCH --nodes=1                  
 #SBATCH --ntasks-per-node=32
 #SBATCH --cpus-per-task=1     
 #SBATCH --time=00:30:00           
-#SBATCH --output=expl%j.out
-#SBATCH --error=expl%j.err
+#SBATCH --output=test_advection_%j.out
+#SBATCH --error=test_advection_%j.err
 #SBATCH --mem=0
 
 module purge

@@ -5,6 +5,8 @@ import jax_rmhd as jr
 import jax.numpy as jnp
 import jax.numpy.fft as ft
 import matplotlib.pyplot as plt
+from mpi4py import MPI
+import mpi4jax
 jr.init_cluster()
 
 #parameters
@@ -20,7 +22,7 @@ t_end = 0.1
 cfl_safety = 0.5 
 spatial_dimensions=3
 nblock=6000
-snap_path="data/test_advection/"
+snap_path="data/test_advection"
 
 visc=0.0
 res=0.0
@@ -38,7 +40,7 @@ def init_fields(x,y,z):
 
 # vary nz, fix dt
 dt=0.001
-nz_list=[32,64,128,256,512]
+nz_list=[64,128,256,512,1024]
 if is_control:
     l1err=[]
     l2err=[]
@@ -57,10 +59,10 @@ for nz in nz_list:
     local_denom1=float(jnp.sum(jnp.abs(end_exact.fields)))
     local_err2=float(jnp.sum(jnp.abs((end_state.fields-end_exact.fields))**2))
     local_denom2=float(jnp.sum(jnp.abs(end_exact.fields)**2))
-    err1 = jnp.sum(jax.experimental.multihost_utils.process_allgather(local_err1))
-    denom1 = jnp.sum(jax.experimental.multihost_utils.process_allgather(local_denom1))
-    err2_sq = jnp.sum(jax.experimental.multihost_utils.process_allgather(local_err2))
-    denom2_sq = jnp.sum(jax.experimental.multihost_utils.process_allgather(local_denom2))
+    err1 = mpi4jax.allreduce(local_err1,op=MPI.SUM)
+    denom1 = mpi4jax.allreduce(local_denom1,op=MPI.SUM)
+    err2_sq = mpi4jax.allreduce(local_err2,op=MPI.SUM)
+    denom2_sq = mpi4jax.allreduce(local_denom2,op=MPI.SUM)
     err2 = jnp.sqrt(err2_sq)
     denom2 = jnp.sqrt(denom2_sq)
     rel1 = err1 / denom1
@@ -75,12 +77,3 @@ for nz in nz_list:
 if is_control:
     jnp.savez(snap_path+"nz_test.npz",nz=nz_list,l1=l1err,l2=l2err)
 
-
-    plt.figure(1)
-    plt.loglog(nz_list,l1err,label='L1')
-    plt.loglog(nz_list,l2err,label='L2')
-    plt.loglog(nz_list,jnp.array(nz_list)**-4.0,label='-4')
-    plt.xlabel(r'$n_z$')
-    plt.ylabel('relative error')
-    plt.legend()
-    plt.savefig(snap_path+"nz_test_advection.png")

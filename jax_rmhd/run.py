@@ -60,7 +60,8 @@ def simulate_scan(state,kgrid,params,nblock,t_snap,t_end,mngr,schemestr='lsrk33'
         save_snapshot(snap,state,mngr)
     while state.t<t_end:
         state, _ = block_of_steps_jit(state,kgrid,params,nblock,scheme,stepper)
-        print(state.t)
+        if params.rank==0:
+            print(state.t)
         if state.t - t_last_snapshot > t_snap and save:
             snap=snap+1
             if params.rank==0:

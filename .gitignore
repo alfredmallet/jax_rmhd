@@ -1,6 +1,7 @@
 #Data (snapshots etc) folder
 data/
 examples/data
+tests/data
 
 #Outputs from savio runs
 *.err

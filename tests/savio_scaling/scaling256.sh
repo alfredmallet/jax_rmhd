@@ -1,18 +1,19 @@
 #!/bin/bash
-#SBATCH --job-name=expl
+#SBATCH --job-name=scaling256
 #SBATCH --account=fc_kawturb  
 #SBATCH --partition=savio3       
-#SBATCH --nodes=1                  
+#SBATCH --nodes=8                  
 #SBATCH --ntasks-per-node=32
 #SBATCH --cpus-per-task=1     
 #SBATCH --time=00:30:00           
-#SBATCH --output=expl%j.out
-#SBATCH --error=expl%j.err
+#SBATCH --output=scaling256_%j.out
+#SBATCH --error=scaling256_%j.err
 #SBATCH --mem=0
+
+set -euo pipefail
 
 module purge
 module load anaconda3 gcc openmpi
-
 
 export OMP_PROC_BIND=close
 export OMP_PLACES=cores
@@ -26,5 +27,5 @@ export XLA_CPU_ASYNC_THREAD_COUNT=1
 export OMPI_MCA_pml=ucx
 
 PY=/global/home/users/alfredmallet/.conda/envs/jax_cpu/bin/python
+time mpirun -n $SLURM_NTASKS "$PY" -u test_savio_scaling.py
 
-time mpirun -n $SLURM_NTASKS "$PY" -u /global/home/users/alfredmallet/jax_rmhd/tests/test_advection.py
