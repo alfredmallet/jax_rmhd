@@ -5,3 +5,9 @@ from typing import NamedTuple
 class SimulationState(NamedTuple):
     t: float
     fields: jnp.ndarray
+
+#This object stores all the relevant linear matrices for the problem
+class LinearMatrices(NamedTuple):
+    diag: jnp.ndarray
+    proj: jnp.ndarray
+    proj_inv: jnp.ndarray

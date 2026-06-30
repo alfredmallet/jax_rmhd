@@ -47,7 +47,7 @@ class LSRK_Scheme(NamedTuple):
 # LSRK timestepper: includes an integrating factor for the dissipative terms.
 # The loop over stages is now done with jax.lax.scan to enforce boundary between stages
 # This seems to avoid so much CPU memory layout thrashing.
-def lsrk_advance(state, kgrid, params, rhs, set_timestep, scheme):
+def lsrk_advance(state, kgrid, linmats, params, rhs, set_timestep, scheme):
     alphas_arr = jnp.array(scheme.alphas)
     betas_arr = jnp.array(scheme.betas)
     gammas_arr = jnp.array(scheme.gammas)
@@ -58,13 +58,25 @@ def lsrk_advance(state, kgrid, params, rhs, set_timestep, scheme):
     else:
         dt = params.dt
 
-    diss_exponents = kgrid.hdiss_exponents(params) * dt
+    #diss_exponents = kgrid.hdiss_exponents(params) * dt
+    linear_exponents = linmats.diag*dt
+
 
     init_delta = jnp.zeros_like(state.fields)
     init_carry = (state,init_delta)
 
     stage_pars = (alphas_arr, betas_arr, gammas_arr, jnp.arange(scheme.nstages))
 
+    def apply_linear_factors(linear_factors, arr):
+        if linmats.proj is None:
+            return linear_factors*arr
+        #project onto eigenfunctions
+        arr_eig = jnp.einsum('ijaxy, jzxy -> izxy',linmats.proj_inv,arr)
+        #multiply by diagonal integrating factor matrix in the eigenfunction basis
+        arr_eig_scaled = linear_factors * arr_eig
+        #transform back to physical fields
+        return jnp.einsum('ijaxy, jzxy -> izxy',linmats.proj,arr_eig_scaled)
+    
     def scan_stage_func(carry,stage_vals):
         current_state, delta = carry
         alpha, beta, gamma, istage = stage_vals
@@ -72,10 +84,10 @@ def lsrk_advance(state, kgrid, params, rhs, set_timestep, scheme):
         stage_rhs = jax.lax.cond(istage == 0,lambda: init_rhs,
                                  lambda: rhs(current_state,kgrid,params)[0])
         
-        diss_factors = jnp.exp(diss_exponents*gamma)
+        linear_factors = jnp.exp(linear_exponents*gamma)
 
-        next_delta = diss_factors * (alpha * delta + dt * stage_rhs)
-        next_fields = diss_factors * current_state.fields + beta*next_delta
+        next_delta = apply_linear_factors(linear_factors, (alpha * delta + dt * stage_rhs))
+        next_fields = apply_linear_factors(linear_factors,current_state.fields) + beta*next_delta
         next_t = current_state.t + gamma*dt
         return (SimulationState(t=next_t,fields=next_fields),next_delta), None
     

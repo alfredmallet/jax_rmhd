@@ -29,3 +29,20 @@ def z_derivatives(f,params):
     df_dz = (- p2 + 8*p1 - 8*m1 + m2) / (12 * dz)
     d4f_dz4 = (p2 -4*p1 +6*c -4*m1 + m2) / (dz**4)
     return df_dz, d4f_dz4
+
+#calculates the 2x2 matrix exponential using sylvester's formula
+#nb: this is not generalizable to larger # of fields, we will have to do something else
+#have not actually used this yet; not deleting since it could be useful
+def matrix_exp(M,dt,tol=1e-5):
+    T = jnp.trace(M)
+    D = jnp.linalg.det(M)
+    lam_av = T/2
+    diff_sq = T**2 / 4.0 - D
+    z_sq = diff_sq * dt**2
+    lsmall = jnp.abs(z_sq)<tol
+    z = jnp.where(lsmall,1,jnp.sqrt(z_sq))
+    S_large = jnp.sinh(z)/z * dt
+    S_small = (1 + z_sq/6.0 + z_sq**2 / 120.0) * dt
+    S = jnp.where(lsmall,S_small,S_large)
+    C = jnp.cosh(z)
+    return jnp.exp(-lam_av*dt) * ((lam_av-M)*S + lam_av*C)

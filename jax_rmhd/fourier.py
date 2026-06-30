@@ -15,13 +15,11 @@ class K_Grids(NamedTuple):
         return jnp.where(self.kx**2 + self.ky**2 > 0, 1.0/(self.kx**2 + self.ky**2), 0.0)
     def dealias_filter(self):
         return (self.kx**2 + self.ky**2)<(jnp.shape(self.kx)[0]/3.0)**2
-    def hdiss_exponents(self,params):
-        diss=jnp.array(params.diss)
-        #if params.spatial_dimensions==3:
-        diss_grid = diss.reshape(-1,1,1,1)
-        #else:
-        #    diss_grid = diss.reshape(-1,1,1)
-        return -diss_grid*self.ksq()**params.hyper
+    # this has been moved into physics to be more simple to handle other linear terms
+    #def hdiss_exponents(self,params):
+    #    diss=jnp.array(params.diss)
+    #    diss_grid = diss.reshape(-1,1,1,1)
+    #    return -diss_grid*self.ksq()**params.hyper
 
 def setup_kgrids(params):
     # Gets the wavenumber grid object from parameters.

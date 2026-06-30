@@ -1,3 +1,6 @@
+#This solves the reduced MHD equations in 3D
+#Write out the equations here
+
 import jax.numpy as jnp
 from .. import fourier
 from .shared_physics import gradk,bracket,z_derivatives
@@ -50,3 +53,8 @@ def LinearTerm(state,grads,kgrid,params):
     #RMHD only logic: the z-derivatives belong to the opposite equations
     df_dz_rmhd = jnp.stack([df_dz[1],df_dz[0]])
     return df_dz_rmhd - diss * d4f_dz4
+
+def diss_matrix(kgrid,params):
+    diss=jnp.array(params.diss)
+    diss_grid = diss.reshape(-1,1,1,1)
+    return -diss_grid*kgrid.ksq()**params.hyper

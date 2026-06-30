@@ -6,8 +6,10 @@ from .types import SimulationState
 @register_pytree_node_class
 class Parameters():
     #Stores all static parameters for the problem
-    def __init__(self,nx,ny,Lx,Ly,diss,hyper,cfl_safety,dt=0.1,adaptive_timestep=True,dims=2,nz=0,Lz=0.0,z_diss=0.25,z_diss_hyper=2.0,z_diff_order=4,eqtype="RMHD"):
+    def __init__(self,nx,ny,Lx,Ly,diss,hyper,cfl_safety,dt=0.1,adaptive_timestep=True,dims=2,
+                 nz=0,Lz=0.0,z_diss=0.25,z_diss_hyper=2.0,z_diff_order=4,eqtype="RMHD",eqpars=None):
         self.eqtype=eqtype
+        self.eqpars=eqpars
         self.nfields=eqtype_registry[self.eqtype]
         #perpendicular grid
         self.nx=nx
