@@ -6,8 +6,8 @@
 #SBATCH --ntasks-per-node=32
 #SBATCH --cpus-per-task=1     
 #SBATCH --time=00:30:00           
-#SBATCH --output=scaling128_%j.out
-#SBATCH --error=scaling128_%j.err
+#SBATCH --output=/global/home/users/esromabraham/jax_rmhd/tests/data/test_scaling/scaling128/alfred_tests/scaling128_test_3.out
+#SBATCH --error=/global/home/users/esromabraham/jax_rmhd/tests/data/test_scaling/scaling128/alfred_tests/scaling128_test_3.err
 #SBATCH --mem=0
 
 set -euo pipefail
@@ -26,5 +26,5 @@ export VECLIB_MAXIMUM_THREADS=1
 export XLA_CPU_ASYNC_THREAD_COUNT=1
 export OMPI_MCA_pml=ucx
 
-PY=/global/home/users/alfredmallet/.conda/envs/jax_cpu/bin/python 
+PY=/global/home/users/esromabraham/.conda/envs/jax_cpu/bin/python 
 time mpirun -n $SLURM_NTASKS "$PY" -u test_savio_scaling.py

@@ -4,7 +4,7 @@ import jax
 import jax_rmhd as jr
 import jax.numpy as jnp
 import jax.numpy.fft as ft
-import matplotlib.pyplot as plt
+#import matplotlib.pyplot as plt
 jr.init_cluster()
 
 #parameters
