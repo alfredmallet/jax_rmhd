@@ -14,7 +14,11 @@ class K_Grids(NamedTuple):
     def inv_ksq(self):
         return jnp.where(self.kx**2 + self.ky**2 > 0, 1.0/(self.kx**2 + self.ky**2), 0.0)
     def dealias_filter(self):
-        return (self.kx**2 + self.ky**2)<(jnp.shape(self.kx)[0]/3.0)**2
+        nx = jnp.shape(self.kx)[0]
+        ny = 2 * (jnp.shape(self.ky)[1] - 1)
+        kx_norm = self.kx / self.kx[1,0]
+        ky_norm = self.ky / self.ky[0,1]
+        return (kx_norm**2 / (nx / 3.0)**2 + ky_norm**2 / (ny / 3.0)**2) < 1.0
     def hdiss_exponents(self,params):
         diss=jnp.array(params.diss)
         #if params.spatial_dimensions==3:
