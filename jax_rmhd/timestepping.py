@@ -25,17 +25,19 @@ def rk_advance(state,kgrid,params,rhs,set_timestep,scheme=None):
     f1 = diss_half * (state.fields + 0.5 * dt * k1)
     #f1 = jax.tree_util.tree_map(lambda fn, kn, dh : dh * (fn + 0.5 * dt * kn), state.fields, k1,diss_half)
     #RK4 substep 2
-    k2,_ = rhs(SimulationState(state.t+dt/2.0,f1),kgrid,params)
+    # NB: forcing_state/forcing_key are threaded through unchanged at every sub-stage via
+    # _replace (they're only updated once per full step, in run.block_of_steps).
+    k2,_ = rhs(state._replace(t=state.t+dt/2.0,fields=f1),kgrid,params)
     f2 = diss_half * state.fields + 0.5*dt*k2
     #f2 = jax.tree_util.tree_map(lambda fn, kn, dh : dh * fn + 0.5 * dt * kn, state.fields, k2,diss_half)
     #RK4 substep 3
-    k3,_ = rhs(SimulationState(state.t+dt/2.0,f2),kgrid,params)
+    k3,_ = rhs(state._replace(t=state.t+dt/2.0,fields=f2),kgrid,params)
     f3 = diss_full * state.fields + dt * diss_half * k3
     #f3 = jax.tree_util.tree_map(lambda fn, kn, df, dh : df * fn + dt * dh * kn, state.fields, k3, diss_full, diss_half)
     #RK4 final step
-    k4,_ = rhs(SimulationState(state.t+dt,f3),kgrid,params)
+    k4,_ = rhs(state._replace(t=state.t+dt,fields=f3),kgrid,params)
     f_end = diss_full * state.fields + (dt/6.0) * (diss_full * k1 + 2.0*diss_half*k2+2.0*diss_half*k3+k4)
-    return SimulationState(t=state.t + dt, fields=f_end)
+    return state._replace(t=state.t + dt, fields=f_end)
 
 # object defining low-storage Runge-Kutta (lsrk) schemes
 class LSRK_Scheme(NamedTuple):
@@ -77,7 +79,8 @@ def lsrk_advance(state, kgrid, params, rhs, set_timestep, scheme):
         next_delta = diss_factors * (alpha * delta + dt * stage_rhs)
         next_fields = diss_factors * current_state.fields + beta*next_delta
         next_t = current_state.t + gamma*dt
-        return (SimulationState(t=next_t,fields=next_fields),next_delta), None
+        # forcing_state/forcing_key threaded through unchanged (see rk_advance comment above).
+        return (current_state._replace(t=next_t,fields=next_fields),next_delta), None
     
     (final_state, _), _ = jax.lax.scan(scan_stage_func,init_carry,stage_pars)
 

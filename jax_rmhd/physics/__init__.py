@@ -23,7 +23,7 @@ def construct_rhs(recipe):
 
 equation_registry = {
     "RMHD": EquationRecipe(set_timestep_func = rmhd.set_timestep,
-                           term_funcs = (rmhd.NonlinearTerm, rmhd.LinearTerm),
+                           term_funcs = (rmhd.NonlinearTerm, rmhd.LinearTerm, rmhd.ForcingTerm),
                            grad_func = rmhd.grad
                            ),
 }

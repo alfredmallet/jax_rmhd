@@ -3,7 +3,7 @@ import jax.numpy as jnp
 import jax.numpy.fft as ft
 from typing import NamedTuple
 
-#nb the code is only spectral in the perpendciular plane, so this is all 2D
+# nb the code is only spectral in the perpendciular plane, so fourier stuff is all 2D
 
 class K_Grids(NamedTuple):
     # Stores the wavenumber grids and methods
@@ -42,3 +42,9 @@ def fft(f):
 
 def ifft(f,params):
     return ft.irfft2(f,s=(params.nx,params.ny),axes=(-2,-1))
+
+def local_z_coords(params):
+    # z coords stored on local rank
+    nz_device = params.nz // params.size
+    idx_device = params.rank * nz_device + jnp.arange(nz_device)
+    return idx_device * params.dz

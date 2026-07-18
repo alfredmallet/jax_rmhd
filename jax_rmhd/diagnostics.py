@@ -1,6 +1,6 @@
 import jax
 import jax.numpy as jnp
-from . import fourier
+from . import grids
 import jax.numpy.fft as ft
 
 #
@@ -57,7 +57,7 @@ def parspec(state,kgrid,params,bin_factor=2.0):
 def energy(fields,kgrid):
     from .physics import gradk
     #These aren't really v and b but the squares are the same..
-    vsq=jnp.mean(jnp.array(jax.tree_util.tree_map(lambda gfk: fourier.ifft(gfk),gradk(fields.phik,kgrid)))**2.0)
-    bsq=jnp.mean(jnp.array(jax.tree_util.tree_map(lambda gfk: fourier.ifft(gfk),gradk(fields.psik,kgrid)))**2.0)
+    vsq=jnp.mean(jnp.array(jax.tree_util.tree_map(lambda gfk: grids.ifft(gfk),gradk(fields.phik,kgrid)))**2.0)
+    bsq=jnp.mean(jnp.array(jax.tree_util.tree_map(lambda gfk: grids.ifft(gfk),gradk(fields.psik,kgrid)))**2.0)
     return (vsq,bsq)
 

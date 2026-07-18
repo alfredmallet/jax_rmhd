@@ -5,8 +5,9 @@ from .timestepping import get_scheme
 from .snapshot_io import save_snapshot
 from time import perf_counter
 from .physics import equation_registry, construct_rhs
+from .physics.shared_physics import ou_update
 from .types import SimulationState
-from .fourier import fft
+from .grids import fft, local_z_coords
 
 def initialize(func,params):
     # use this to initialize with some known function.
@@ -16,14 +17,15 @@ def initialize(func,params):
         x = jnp.linspace(0, params.Lx, params.nx, endpoint=False).reshape(1,-1,1)
         y = jnp.linspace(0, params.Ly, params.ny, endpoint=False).reshape(1,1,-1)
         if params.spatial_dimensions==3:
-            nz_device = params.nz//params.size
-            idx_device = params.rank * nz_device + jnp.arange(nz_device)
-            z_device = (idx_device * params.dz).reshape(-1,1,1)
-            state = SimulationState(t=0.0,fields=fft(f(x,y,z_device)))
+            z_device = local_z_coords(params).reshape(-1,1,1)
+            fields = fft(f(x,y,z_device))
         else:
-            state = SimulationState(t=0.0,fields=fft(f(x,y)))
-        return state
-    return _init(func)        
+            fields = fft(f(x,y))
+        nkx, nky = params.nx, params.ny//2 + 1
+        forcing_state = jnp.zeros((params.n_ou, 2, nkx, nky), dtype=fields.dtype)
+        forcing_key = jax.random.key(params.forcing_seed)
+        return SimulationState(t=0.0,fields=fields,forcing_state=forcing_state,forcing_key=forcing_key)
+    return _init(func)
 
 #This can be used to estimate a good nblock. You can set the minimum higher.
 def estimate_good_nblock(state,kgrid,params,t_snap,t_end,t_last_snap=0,nblock_min=10):
@@ -38,7 +40,15 @@ def block_of_steps(state,kgrid,params,nblock,scheme,stepper):
     def stepping(state,_):
         set_timestep = equation_registry[params.eqtype].set_timestep_func
         rhs = construct_rhs(equation_registry[params.eqtype])
-        return stepper(state,kgrid,params,rhs,set_timestep,scheme), None
+        new_state = stepper(state,kgrid,params,rhs,set_timestep,scheme)
+        # Advance the O-U forcing state exactly once per full timestep
+        if params.forcing:
+            dt = new_state.t - state.t
+            new_forcing_state, new_forcing_key = ou_update(
+                new_state.forcing_state, new_state.forcing_key, dt, params, kgrid
+            )
+            new_state = new_state._replace(forcing_state=new_forcing_state, forcing_key=new_forcing_key)
+        return new_state, None
     final_state,_ = jax.lax.scan(stepping,state,None,nblock)
     return final_state,None
 
@@ -85,7 +95,14 @@ def simulate(initial_state,kgrid,params,t_snap,t_end,mngr,schemestr='lsrk33',sav
     set_timestep = equation_registry[params.eqtype].set_timestep_func
     rhs = construct_rhs(equation_registry[params.eqtype])
     def stepper_wrapped(state):
-        return stepper(state,kgrid,params,rhs,set_timestep,scheme)
+        new_state = stepper(state,kgrid,params,rhs,set_timestep,scheme)
+        if params.forcing:
+            dt = new_state.t - state.t
+            new_forcing_state, new_forcing_key = ou_update(
+                new_state.forcing_state, new_state.forcing_key, dt, params, kgrid
+            )
+            new_state = new_state._replace(forcing_state=new_forcing_state, forcing_key=new_forcing_key)
+        return new_state
     def sim_to_next_snap(state,target_t):
         def snap_cond(state):
             return state.t<target_t

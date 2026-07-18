@@ -6,7 +6,8 @@ from .types import SimulationState
 @register_pytree_node_class
 class Parameters():
     #Stores all static parameters for the problem
-    def __init__(self,nx,ny,Lx,Ly,diss,hyper,cfl_safety,dt=0.1,adaptive_timestep=True,dims=2,nz=0,Lz=0.0,z_diss=0.25,z_diss_hyper=2.0,z_diff_order=4,eqtype="RMHD"):
+    def __init__(self,nx,ny,Lx,Ly,diss,hyper,cfl_safety,dt=0.1,adaptive_timestep=True,dims=2,nz=0,Lz=0.0,z_diss=0.25,z_diss_hyper=2.0,z_diff_order=4,eqtype="RMHD",
+                 forcing=False,forcing_mode="momentum",forcing_power=1.0,forcing_power_elsasser=(1.0,1.0),forcing_tau=1.0,fshell=(1,2),forcing_seed=0,forcing_scale_max=1.0):
         self.eqtype=eqtype
         self.nfields=eqtype_registry[self.eqtype]
         #perpendicular grid
@@ -53,6 +54,18 @@ class Parameters():
             self.right_neighbor = None
             if self.size > 1 and self.rank==0:
                 print("You probably should only run a 2D run on one device, since this isn't parallelized.")
+        #forcing
+        self.forcing = forcing
+        if forcing_mode not in ("momentum","elsasser"):
+            raise ValueError(f"forcing_mode must be 'momentum' or 'elsasser', got {forcing_mode!r}")
+        self.forcing_mode = forcing_mode
+        self.forcing_power = forcing_power
+        self.forcing_power_elsasser = forcing_power_elsasser
+        self.forcing_tau = forcing_tau
+        self.fshell = fshell
+        self.forcing_seed = forcing_seed
+        self.forcing_scale_max = forcing_scale_max
+        self.n_ou = 1 if self.forcing_mode == "momentum" else 2
     def tree_flatten(self):
         children = ()
         param_data = {k: v for k, v in self.__dict__.items()}

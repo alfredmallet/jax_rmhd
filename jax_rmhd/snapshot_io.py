@@ -10,6 +10,9 @@ def get_precision_types():
         return jnp.float64, jnp.complex128
     else:
         return jnp.float32, jnp.complex64
+
+def get_key_dtype():
+    return jax.eval_shape(lambda: jax.random.key(0)).dtype
     
 # Setting up Orbax stuff
 def snapshot_manager_setup(params,snap_path="data",nsnap=1000):
@@ -50,17 +53,23 @@ def load_snapshot(isnap,mngr,params):
     z_start_l = params.rank * nz_load
     z_end_l = (params.rank + 1) * nz_load
 
-    # Setup the expected ShapeDtypeStruct for loading from the saved ranks
+    # Setup the expected ShapeDtypeStruct for loading from the saved ranks.
     if params.spatial_dimensions == 3:
         shape_complex_s = (params.nfields, nz_save, params.nx, params.ny // 2 + 1)
     else:
         shape_complex_s = (params.nfields, 1, params.nx, params.ny // 2 + 1)
-    
+
+    nkx, nky = params.nx, params.ny // 2 + 1
+    # forcing_state/forcing_key have no z-axis and are identical on every saved rank
+    forcing_state_like_s = jax.ShapeDtypeStruct((params.n_ou, 2, nkx, nky), ctype)
+    forcing_key_like_s = jax.ShapeDtypeStruct((), get_key_dtype())
+
     fields_like_s = jax.ShapeDtypeStruct(shape_complex_s, ctype)
-    state_like_s = SimulationState(t=jax.ShapeDtypeStruct((), ftype), fields=fields_like_s)
+    state_like_s = SimulationState(t=jax.ShapeDtypeStruct((), ftype), fields=fields_like_s,
+                                    forcing_state=forcing_state_like_s, forcing_key=forcing_key_like_s)
     options = ocp.CheckpointManagerOptions()
 
-    #iterate over saved ranks and extract overlapping z-slices
+    #iterate over saved ranks and extract overlapping z-slices (fields/t only)
     for rank_s in range(p_save):
         z_start_s = rank_s * nz_save
         z_end_s = (rank_s + 1) * nz_save
@@ -74,7 +83,7 @@ def load_snapshot(isnap,mngr,params):
             path_s = os.path.abspath(os.path.join(snap_path, str(rank_s))) if p_save > 1 else os.path.abspath(snap_path)
             mngr_s = ocp.CheckpointManager(path_s, options=options)
             state_s = mngr_s.restore(isnap, args=ocp.args.StandardRestore(state_like_s))
-            
+
             #slice coordinates
             s_start = g_start - z_start_s
             s_end = g_end - z_start_s
@@ -84,7 +93,15 @@ def load_snapshot(isnap,mngr,params):
             restored_fields = restored_fields.at[:, l_start:l_end, :, :].set(state_s.fields[:, s_start:s_end, :, :])
             restored_t = state_s.t
 
-    return SimulationState(t=restored_t, fields=restored_fields)
+    # forcing_state/forcing_key: restore once from rank 0
+    path_0 = os.path.abspath(os.path.join(snap_path, "0")) if p_save > 1 else os.path.abspath(snap_path)
+    mngr_0 = ocp.CheckpointManager(path_0, options=options)
+    state_0 = mngr_0.restore(isnap, args=ocp.args.StandardRestore(state_like_s))
+    restored_forcing_state = state_0.forcing_state
+    restored_forcing_key = state_0.forcing_key
+
+    return SimulationState(t=restored_t, fields=restored_fields,
+                            forcing_state=restored_forcing_state, forcing_key=restored_forcing_key)
 
 
 def find_items(isnap,snap_path):
