@@ -13,8 +13,8 @@ def get_precision_types():
     
 # Setting up Orbax stuff
 def snapshot_manager_setup(snap_path="data",nsnap=1000):
-    checkpoint_path = os.path.abspath(snap_path)
-    options = ocp.CheckpointManagerOptions()
+    checkpoint_path = os.path.abspath(snap_path) # returns the absolute path of "snap_path"
+    options = ocp.CheckpointManagerOptions() # ocp = orbax checkpoints
     return ocp.CheckpointManager(directory=checkpoint_path,options=options)
 
 def save_snapshot(isnap,state,mngr):

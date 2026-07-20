@@ -1,0 +1,16 @@
+import matplotlib.pyplot as plt
+import numpy as np
+
+
+# these tests kept nx and ny 256, and changed nz and number of cores by x2
+nz_values = np.array([256, 512, 1024]) # value of grid points in z
+speeds = np.array([69.53976753004827, 70.50563688494731, 70.76396270701662]) # speed of test
+
+plt.plot(nz_values, speeds, color='red', marker='o')
+plt.plot(nz_values, speeds, color='green', marker='o')
+plt.title('Nz values vs. Speed of the tests')
+plt.xlabel('nz values')
+plt.ylim(0, 100)
+plt.ylabel('speed (s)')
+
+plt.savefig("/Users/esromabraham/assure-2026/jax_rmhd/poster_images/nz_vs_speed.png")

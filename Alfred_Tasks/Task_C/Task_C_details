@@ -1,0 +1,19 @@
+1) [✅] To run more realistic turbulence simulations, we will need to add forcing to the equations. 
+This basically means artificially adding energy into the low-k (large-scale) modes at each timestep. 
+Could you look up how to generate random numbers in jax, 
+and write a function to generate a random Gaussian with a specified variance?
+
+2) [✅] Once you have this working, could you write a new function that imposes a finite correlation time? 
+This is called an Ornstein–Uhlenbeck process; basically, if F(t) is the random Gaussian at time t from task 1, 
+at the next timestep t+dt, the random function should be
+
+F(t+dt) = theta * F(t) + sqrt(1-theta**2) * F',
+
+where F' is a different random Gaussian sample with the same variance, and theta = exp(-dt/tcorr), 
+with tcorr a parameter (this is called the correlation time). 
+You should plot F versus time and see how it changes as you vary tcorr.
+
+3) [-] The final task is to integrate this into the code: we need to add this forcing to some of the large scale (low k) 
+fluctuating turbulent fields in our simulations. 
+This is going to be a bit of a challenge, and it might be better to wait until I get back so we can do it together: 
+but if you feel up for trying please go for it! Once this is done, we will be able to run large-scale simulations.

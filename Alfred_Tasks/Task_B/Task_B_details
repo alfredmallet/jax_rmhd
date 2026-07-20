@@ -1,0 +1,3 @@
+1) [✅] Scope out how to make python accept yaml input files: this would be really useful for quickly running simulations with different parameters, for example. You can look at https://pyyaml.org/wiki/PyYAMLDocumentation
+... but you can also just google and look around to figure out how this works.
+2) [✅] Write some code to implement this! You can look at jax_rmhd/config.py to see what inputs the Parameters object needs.

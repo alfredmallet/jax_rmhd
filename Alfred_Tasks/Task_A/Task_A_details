@@ -1,0 +1,10 @@
+Task A:
+
+If you could make
+
+1) [✅] plots describing the results of the advection test (error as a function of nz).
+2) [✅] plots for the "strong scaling" test that you already ran (increasing cores while keeping nz fixed).
+3) [✅] plots for a "weak scaling test": increasing nz and # cores by the same amount and checking the time taken.
+4) [✅???] Adapt the orzag-tang-2D notebook to make images of the spectrum as a function of time. This kind of analysis will be repeated once we are doing the real production runs for 3D turbulence at 1024^3.
+5) [-] Write a detailed report describing what you did in the steps above and what it means. 
+This could be the first section of your final poster -- and possibly part of a paper describing this code.

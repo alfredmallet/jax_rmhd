@@ -1,0 +1,9 @@
+1) [❓] If you like, you could try and install the gpu version of jax (and the other packages) on the cluster (in a different conda env, for safety) and see if you can get that running too: it may require talking to the brc chatbot (lol) to figure out the correct installation instructions. You can find it in the lower right on this webpage: https://docs-research-it.berkeley.edu/services/high-performance-computing/overview/
+
+2) [❓] If you do manage this, you could potentially run the scaling studies on GPUs too. Bear in mind that each GPU can handle a much higher load than each CPU core. You can ask the brc chatbot which GPU nodes it would be best to run on, and edit the .sh file accordingly. This may be a bit difficult, so don't worry if you don't get to this, we can work on it together the week after.
+(it may be best to work in 32 bit precision for this: you can set this by at the start of your .py file by writing
+
+import os
+os.environ["RMHD_PRECISION"] = "32"
+
+If you look at the current scaling test, you can see this is set to 64, which is better for real physics simulations, but there are not many gpus on the cluster optimized for 64 bit, because they mainly care about data science rather than physics)

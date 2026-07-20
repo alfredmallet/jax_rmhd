@@ -1,0 +1,14 @@
+import matplotlib.pyplot as plt
+import numpy as np
+
+cores = np.array([8, 16, 32, 64, 128, 256, 512])
+times = np.array([458.45752795395674, 347.2659844219452, 298.9849785530241, 148.2951715029776, 70.76396270701662, 44.92584736505523, 30.242890477995388])
+
+
+plt.loglog(cores, times, color='blue', marker='o')
+plt.loglog(cores, 1/cores * 5500, color='black', linestyle='dashed')
+plt.title('Cores vs Time')
+plt.xlabel('Number of Cores')
+plt.ylabel('Time (seconds)')
+plt.tight_layout()
+plt.savefig("/Users/esromabraham/assure-2026/jax_rmhd/poster_images/NCPU_vs_speed.png")
