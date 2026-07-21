@@ -68,6 +68,7 @@ def simulate_scan(state,kgrid,params,nblock,t_snap,t_end,mngr,schemestr='lsrk33'
         if params.rank==0:
             print("Saving initial state as snapshot "+str(snap))
         save_snapshot(snap,state,mngr)
+        mngr.wait_until_finished()
     while state.t<t_end:
         state, _ = block_of_steps_jit(state,kgrid,params,nblock,scheme,stepper)
         if params.rank==0:
@@ -77,6 +78,7 @@ def simulate_scan(state,kgrid,params,nblock,t_snap,t_end,mngr,schemestr='lsrk33'
             if params.rank==0:
                 print("Saving snapshot "+str(snap))
             save_snapshot(snap,state,mngr)
+            mngr.wait_until_finished()
             t_last_snapshot=state.t
     snap=snap+1
     if save:
@@ -111,10 +113,11 @@ def simulate(initial_state,kgrid,params,t_snap,t_end,mngr,schemestr='lsrk33',sav
     state=initial_state
     t_last_snapshot = state.t
     snap=0
-    if save: 
-        if params.rank==0:  
+    if save:
+        if params.rank==0:
             print("Saving initial state as snapshot "+str(snap))
         save_snapshot(snap,state,mngr)
+        mngr.wait_until_finished()
     while state.t<t_end:
         t_next_snapshot=min(t_last_snapshot+t_snap,t_end)
         state = sim_to_next_snap_jit(state,t_next_snapshot)
@@ -123,6 +126,7 @@ def simulate(initial_state,kgrid,params,t_snap,t_end,mngr,schemestr='lsrk33',sav
             if params.rank==0:
                 print ("Saving snapshot "+str(snap)+ " at t = "+str(state.t))
             save_snapshot(snap,state,mngr)
+            mngr.wait_until_finished()
             t_last_snapshot=state.t
     mngr.wait_until_finished()
     t_sim = perf_counter()-t_start
