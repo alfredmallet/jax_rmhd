@@ -63,7 +63,7 @@ def ou_update(forcing_state, forcing_key, dt, params, kgrid):
     # (kx,ky), then restricted to the forcing shell.
     # Question: could this be made more efficient? or is the compiler able to see the mask
     key, new_key = jax.random.split(forcing_key)
-    grid_norm = params.nx * params.ny
+    grid_norm = float(params.nx * params.ny)
     # forcing_state has shape (n_ou, 2, nkx, nky)
     # n_ou is 1 for momentum forcing and 2 for elsasser
     # axis=1 has 2 components to set A and B in reconstruct_envelope below
@@ -97,7 +97,8 @@ def _perp_reduce(integrand, params):
     P = jnp.sum(integrand)
     if params.cart_comm is not None:
         P = mpi4jax.allreduce(P, op=MPI.SUM, comm=params.cart_comm)
-    return P / (params.nz * (params.nx * params.ny)**2)
+    norm = float(params.nz) * float(params.nx * params.ny)**2
+    return P / norm
 
 def perp_inner_product(field_a_k, field_b_k, kgrid, params):
     # Re( sum_k grad(field_a_k)^* . grad(field_b_k) )
