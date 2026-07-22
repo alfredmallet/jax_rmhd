@@ -26,11 +26,18 @@ def snapshot_manager_setup(params,snap_path="data",nsnap=1000):
 def save_snapshot(isnap,state,mngr):
     return mngr.save(isnap,args=ocp.args.StandardSave(state))
 
-def load_snapshot(isnap,mngr,params):
-    if params.size > 1:
-        snap_path = os.path.dirname(mngr.directory)
-    else:
-        snap_path = mngr.directory
+def get_saved_steps(snap_path):
+    snap_path = str(snap_path)
+    rank0_dir = os.path.join(snap_path, "0")
+    options = ocp.CheckpointManagerOptions()
+    if os.path.isdir(rank0_dir) and not os.path.exists(os.path.join(rank0_dir, "default")):
+        mngr_rank0 = ocp.CheckpointManager(os.path.abspath(rank0_dir), options=options)
+        return mngr_rank0.all_steps()
+    mngr = ocp.CheckpointManager(os.path.abspath(snap_path), options=options)
+    return mngr.all_steps()
+
+def load_snapshot(isnap,snap_path,params):
+    snap_path = str(snap_path)
 
     p_save = 1
     if os.path.exists(os.path.join(snap_path, "0", str(isnap))):

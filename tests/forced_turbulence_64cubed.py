@@ -83,8 +83,8 @@ E_kin = 0.5 * float(shared_physics.perp_inner_product(phik, phik, kgrid, params)
 E_mag = 0.5 * float(shared_physics.perp_inner_product(psik, psik, kgrid, params))
 print(f"[rank {params.rank}] final t={float(end_state.t):.4f}  E_kin={E_kin:.4e}  E_mag={E_mag:.4e}")
 
-last_isnap = max(mngr.all_steps())
-reloaded = sn.load_snapshot(last_isnap, mngr, params)
+last_isnap = max(sn.get_saved_steps(snap_path))
+reloaded = sn.load_snapshot(last_isnap, snap_path, params)
 
 t_diff = float(jnp.abs(reloaded.t - end_state.t))
 fields_diff = float(jnp.max(jnp.abs(reloaded.fields - end_state.fields)))
