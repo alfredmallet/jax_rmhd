@@ -44,7 +44,8 @@ for the Savio HPC cluster specifically (hardcoded paths), not general-purpose ex
 
 `examples/*.ipynb` are worked examples of varying freshness — several predate the current
 API (`jr.Fields`, positional `SimulationState(...)` construction) and will error as-is;
-`orzag-tang-2D.ipynb`, `orzag-tang-3d.ipynb`, and `forced-turbulence-2D.ipynb` are current.
+`orzag-tang-2D.ipynb`, `orzag-tang-3d.ipynb`, `forced-turbulence-2D.ipynb`, and
+`forced-turbulence-3D.ipynb` are current.
 
 ## Architecture
 
@@ -72,6 +73,10 @@ any synthetic k-space process whose amplitude is meant to be grid-resolution-ind
 under `jax.jit`, so plain Python `if params.foo:` branching in physics code is correct and
 preferred over `jax.lax.cond`. z-related attributes (`dz`, `Lz`, `z_diss`, `cart_comm`,
 `left_neighbor`/`right_neighbor`) only exist when `dims==3`; guard access to them.
+`z_diff_order`/`z_diss_hyper` are accepted by `Parameters.__init__` and stored, but
+`physics/rmhd.py::LinearTerm` doesn't read them back — z-derivatives are hardcoded to 4th
+order and z-hyperdissipation to the `z_diss_hyper=2` form regardless of what's passed in
+(see the `#TODO` in `LinearTerm`); passing a non-default value silently does nothing.
 
 New equation sets register via `physics/__init__.py`'s `equation_registry`: an
 `EquationRecipe(set_timestep_func, term_funcs, grad_func)` per `eqtype`. `term_funcs` are
@@ -128,11 +133,18 @@ sustaining turbulence instead of letting it freely decay. `forcing_state` shape
 ### Checkpointing
 
 `snapshot_io.py` save/restore is orbax-based, one `CheckpointManager` per MPI rank
-(`snapshot_manager_setup`). `load_snapshot` supports restoring onto a different rank count
+(`snapshot_manager_setup`). `snapshot_manager_setup`'s `nsnap` arg is passed straight
+through as orbax's `max_to_keep` — it used to be silently unwired (every run kept every
+snapshot forever regardless of `nsnap`); it's now honored, so old runs' checkpoint
+directories may hold more snapshots than a run made after this fix would produce.
+`load_snapshot` supports restoring onto a different rank count
 than was saved (`p_save` vs `params.size`) by unioning overlapping z-slices per field —
 `forcing_state`/`forcing_key` are **not** part of that union (they have no z-axis and are
 identical across all saved ranks by construction, since forcing is perpendicular-only and
 kept in sync across ranks); they're restored once, directly from rank 0's checkpoint.
 `forcing_key`'s dtype is obtained via `jax.eval_shape(lambda: jax.random.key(0)).dtype`
-rather than a guessed public constant. Use `mngr.all_steps()` to enumerate saved snapshot
-indices rather than tracking the count manually.
+rather than a guessed public constant. Use `get_saved_steps(snap_path)` rather than
+`mngr.all_steps()` to enumerate saved snapshot indices — `get_saved_steps` detects and
+correctly handles a resharded (multi-rank-saved) layout, whereas a bare `mngr.all_steps()`
+on a top-level manager over such a layout misreads the numbered rank subfolders as step
+numbers.

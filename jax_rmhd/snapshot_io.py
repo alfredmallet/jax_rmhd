@@ -20,7 +20,7 @@ def snapshot_manager_setup(params,snap_path="data",nsnap=1000):
         checkpoint_path = os.path.abspath(snap_path+f'/{params.rank}')
     else:
         checkpoint_path = os.path.abspath(snap_path)
-    options = ocp.CheckpointManagerOptions()
+    options = ocp.CheckpointManagerOptions(max_to_keep=nsnap)
     return ocp.CheckpointManager(directory=checkpoint_path,options=options)
 
 def save_snapshot(isnap,state,mngr):

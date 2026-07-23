@@ -4,9 +4,6 @@ import jax.numpy as jnp
 from .types import SimulationState
 from typing import NamedTuple,Tuple
 
-#debug
-from jax.debug import inspect_array_sharding
-
 # Standard RK4 with integrating factor.
 # Problem is it uses a lot of memory on k1-k4.
 # I think it is always better to use the LSRK schemes
@@ -23,17 +20,14 @@ def rk_advance(state,kgrid,params,rhs,set_timestep,scheme=None):
     diss_full = jnp.exp(kgrid.hdiss_exponents(params)*dt)
     diss_half = jnp.exp(kgrid.hdiss_exponents(params)*dt/2)
     f1 = diss_half * (state.fields + 0.5 * dt * k1)
-    #f1 = jax.tree_util.tree_map(lambda fn, kn, dh : dh * (fn + 0.5 * dt * kn), state.fields, k1,diss_half)
     #RK4 substep 2
     # NB: forcing_state/forcing_key are threaded through unchanged at every sub-stage via
     # _replace (they're only updated once per full step, in run.block_of_steps).
     k2,_ = rhs(state._replace(t=state.t+dt/2.0,fields=f1),kgrid,params)
     f2 = diss_half * state.fields + 0.5*dt*k2
-    #f2 = jax.tree_util.tree_map(lambda fn, kn, dh : dh * fn + 0.5 * dt * kn, state.fields, k2,diss_half)
     #RK4 substep 3
     k3,_ = rhs(state._replace(t=state.t+dt/2.0,fields=f2),kgrid,params)
     f3 = diss_full * state.fields + dt * diss_half * k3
-    #f3 = jax.tree_util.tree_map(lambda fn, kn, df, dh : df * fn + dt * dh * kn, state.fields, k3, diss_full, diss_half)
     #RK4 final step
     k4,_ = rhs(state._replace(t=state.t+dt,fields=f3),kgrid,params)
     f_end = diss_full * state.fields + (dt/6.0) * (diss_full * k1 + 2.0*diss_half*k2+2.0*diss_half*k3+k4)
