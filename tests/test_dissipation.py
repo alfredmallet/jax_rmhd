@@ -25,7 +25,7 @@ snap_path="data/test_dissipation/"
 
 hyper=1
 
-mngr=jr.snapshot_manager_setup(snap_path=snap_path,nsnap=nsnap)
+mngr=None # created in the loop below, once params exists (API now needs params)
 
 def init_fields(x,y,z):
     phi = jnp.cos(x) * jnp.cos(y) * jnp.cos(z)
@@ -41,6 +41,8 @@ for diss in diss_list:
     params=jr.Parameters(nx=nx,ny=ny,nz=nz,Lx=Lx,Ly=Ly,Lz=Lz,diss=(diss,diss),
                          hyper=hyper,cfl_safety=cfl_safety,dt=dt,adaptive_timestep=False,dims=spatial_dimensions)
     kgrid = jr.setup_kgrids(params)
+    if mngr is None:
+        mngr=jr.snapshot_manager_setup(params,snap_path=snap_path,nsnap=nsnap)
     state=jr.initialize(init_fields,params)
     start_energy = jnp.sum(jnp.abs(state.fields)**2)/nx/ny/nz
     end_state=jr.simulate_scan(state,kgrid,params,nblock,t_snap,t_end,mngr,save=False)

@@ -30,7 +30,7 @@ hyper=3
 
 is_control = (jax.process_index() == 0)
 
-mngr=jr.snapshot_manager_setup(snap_path=snap_path,nsnap=nsnap)
+mngr=None # created in the loop below, once params exists (API now needs params)
 
 def init_fields(x,y,z):
     phi = jnp.cos(x) * jnp.cos(y) * jnp.cos(z)
@@ -48,6 +48,8 @@ for nz in nz_list:
     params=jr.Parameters(nx=nx,ny=ny,nz=nz,Lx=Lx,Ly=Ly,Lz=Lz,diss=(visc,res),
                          hyper=hyper,cfl_safety=cfl_safety,dt=dt,adaptive_timestep=False,dims=spatial_dimensions)
     kgrid = jr.setup_kgrids(params)
+    if mngr is None:
+        mngr=jr.snapshot_manager_setup(params,snap_path=snap_path,nsnap=nsnap)
     state=jr.initialize(init_fields,params)
     end_state=jr.simulate_scan(state,kgrid,params,nblock,t_snap,t_end,mngr,save=False)
     def end_fields(x,y,z):

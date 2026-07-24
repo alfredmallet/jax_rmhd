@@ -1,10 +1,12 @@
-from typing import NamedTuple,Tuple,Callable
+from typing import NamedTuple,Tuple,Callable,Optional
 from . import rmhd
 
 class EquationRecipe(NamedTuple):
     set_timestep_func: Callable
     term_funcs: Tuple[Callable,...]
     grad_func: Callable
+    # per-equation once-per-step forcing scale (params.forcing_norm_per_step); optional
+    forcing_scale_func: Optional[Callable] = None
 
 
 # Constructs the ideal RHS of the equations using the relevant EquationRecipe.
@@ -24,6 +26,7 @@ def construct_rhs(recipe):
 equation_registry = {
     "RMHD": EquationRecipe(set_timestep_func = rmhd.set_timestep,
                            term_funcs = (rmhd.NonlinearTerm, rmhd.LinearTerm, rmhd.ForcingTerm),
-                           grad_func = rmhd.grad
+                           grad_func = rmhd.grad,
+                           forcing_scale_func = rmhd.forcing_scale
                            ),
 }

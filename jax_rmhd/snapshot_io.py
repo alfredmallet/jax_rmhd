@@ -24,7 +24,9 @@ def snapshot_manager_setup(params,snap_path="data",nsnap=1000):
     return ocp.CheckpointManager(directory=checkpoint_path,options=options)
 
 def save_snapshot(isnap,state,mngr):
-    return mngr.save(isnap,args=ocp.args.StandardSave(state))
+    # forcing_scale is stripped (None = empty pytree): it's recomputed on simulate start,
+    # keeping checkpoints structurally identical whether or not forcing_norm_per_step is on.
+    return mngr.save(isnap,args=ocp.args.StandardSave(state._replace(forcing_scale=None)))
 
 def get_saved_steps(snap_path):
     snap_path = str(snap_path)
@@ -107,8 +109,11 @@ def load_snapshot(isnap,snap_path,params):
     restored_forcing_state = state_0.forcing_state
     restored_forcing_key = state_0.forcing_key
 
+    # forcing_scale isn't checkpointed; zeros placeholder here, recomputed by simulate.
+    restored_scale = jnp.zeros((params.n_ou,), dtype=ftype) if (params.forcing and params.forcing_norm_per_step) else None
     return SimulationState(t=restored_t, fields=restored_fields,
-                            forcing_state=restored_forcing_state, forcing_key=restored_forcing_key)
+                            forcing_state=restored_forcing_state, forcing_key=restored_forcing_key,
+                            forcing_scale=restored_scale)
 
 
 def find_items(isnap,snap_path):

@@ -1,6 +1,6 @@
 import jax
 import jax.numpy as jnp
-from typing import NamedTuple
+from typing import NamedTuple, Optional
 
 #Simulation state should be represented as a tuple (t,fields), with fields an array (nfields,nz,nx,ny)
 class SimulationState(NamedTuple):
@@ -10,3 +10,7 @@ class SimulationState(NamedTuple):
                                 # axis 0: n_ou = 1 ("momentum" mode) or 2 ("elsasser" mode: z+, z-)
                                 # axis 1: [A, B] cosine/sine z-envelope coefficients
     forcing_key: jax.Array      # JAX PRNG key (typed key)
+    forcing_scale: Optional[jnp.ndarray] = None
+                                # shape (n_ou,), real: per-step power-normalization scale,
+                                # updated once per full step in run.py when
+                                # params.forcing_norm_per_step; None (empty pytree) otherwise

@@ -148,3 +148,24 @@ rather than a guessed public constant. Use `get_saved_steps(snap_path)` rather t
 correctly handles a resharded (multi-rank-saved) layout, whereas a bare `mngr.all_steps()`
 on a top-level manager over such a layout misreads the numbered rank subfolders as step
 numbers.
+
+Snapshot indices must mean the same simulation time on **every** rank — `load_snapshot`
+assumes it, and orbax's `max_to_keep` prunes each rank's directory independently, so any
+per-rank numbering skew compounds into different rank groups holding different index
+windows. `run.py`'s `simulate`/`simulate_scan` therefore broadcast rank 0's starting index
+(`max(all_steps())+1`) to all ranks rather than letting each rank derive its own: computing
+it per-rank desynchronizes on restart-with-more-ranks, where pre-existing rank dirs resume
+from their old latest step while brand-new (empty) dirs restart from 0 (the observed
+symptom: after a 32→64 restart with `nsnap=20`, ranks 0–31 held snapshots 20–39 and ranks
+32–63 held 16–35 — same data, offset indices, independently pruned). Regression test:
+`tests/test_restart_resharding.py` (+ `slurms/test_restart_resharding.sh`), run `-n 2` then
+`-n 4` on the same `snap_path`. The correct invariant it checks is NOT "all rank dirs hold
+identical index sets": pre-existing ranks may legitimately retain *older* snapshots the new
+ranks never existed to write. It is (a) identical latest index everywhere and (b) exact
+agreement from the newest "oldest index" upward, plus identical `t` per common index.
+
+Snapshot cadence caveat: `simulate`'s inner while-loop steps until `t >= target`, so with
+large dt (e.g. near-zero fields early in a forced run from quiescence) it can overshoot a
+`t_snap` target or `t_end` by a whole step — snapshots are "at least `t_snap` apart" and
+the final time is ">= t_end", not exact. Don't write tests (or diagnostics postprocessing)
+that assume an exact snapshot count or exact end time.

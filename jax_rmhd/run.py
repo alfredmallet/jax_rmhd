@@ -24,12 +24,39 @@ def initialize(func,params):
         nkx, nky = params.nx, params.ny//2 + 1
         forcing_state = jnp.zeros((params.n_ou, 2, nkx, nky), dtype=fields.dtype)
         forcing_key = jax.random.key(params.forcing_seed)
-        return SimulationState(t=0.0,fields=fields,forcing_state=forcing_state,forcing_key=forcing_key)
+        # forcing_scale only carried when forcing_norm_per_step; zeros is safe (forcing_state
+        # is zero at t=0 anyway) and it's recomputed every step / on simulate start.
+        forcing_scale = jnp.zeros((params.n_ou,)) if (params.forcing and params.forcing_norm_per_step) else None
+        return SimulationState(t=0.0,fields=fields,forcing_state=forcing_state,forcing_key=forcing_key,
+                               forcing_scale=forcing_scale)
     return _init(func)
+
+def _advance_forcing(new_state, prev_t, kgrid, params):
+    # Per-full-step forcing update: OU advance plus, when forcing_norm_per_step, the
+    # power-normalization scale reused across all sub-stages of the next step.
+    dt = new_state.t - prev_t
+    new_forcing_state, new_forcing_key = ou_update(
+        new_state.forcing_state, new_state.forcing_key, dt, params, kgrid
+    )
+    new_state = new_state._replace(forcing_state=new_forcing_state, forcing_key=new_forcing_key)
+    if params.forcing_norm_per_step:
+        scale_func = equation_registry[params.eqtype].forcing_scale_func
+        new_state = new_state._replace(forcing_scale=scale_func(new_state, kgrid, params))
+    return new_state
+
+def _refresh_forcing_scale(state, kgrid, params):
+    # Recompute the per-step scale for the initial (possibly checkpoint-restored) state,
+    # since forcing_scale is not checkpointed.
+    if params.forcing and params.forcing_norm_per_step:
+        scale_func = equation_registry[params.eqtype].forcing_scale_func
+        state = state._replace(forcing_scale=scale_func(state, kgrid, params))
+    return state
 
 #This can be used to estimate a good nblock. You can set the minimum higher.
 def estimate_good_nblock(state,kgrid,params,t_snap,t_end,t_last_snap=0,nblock_min=10):
-    set_timestep,_,grad = equation_registry[params.eqtype] 
+    # attribute access (not tuple unpack) so EquationRecipe can grow fields
+    recipe = equation_registry[params.eqtype]
+    set_timestep, grad = recipe.set_timestep_func, recipe.grad_func
     grads = grad(state,kgrid,params)
     dt = set_timestep(grads,params)
     t_next_snap = min(t_last_snap+t_snap,t_end)
@@ -41,13 +68,9 @@ def block_of_steps(state,kgrid,params,nblock,scheme,stepper):
         set_timestep = equation_registry[params.eqtype].set_timestep_func
         rhs = construct_rhs(equation_registry[params.eqtype])
         new_state = stepper(state,kgrid,params,rhs,set_timestep,scheme)
-        # Advance the O-U forcing state exactly once per full timestep
+        # Advance the O-U forcing state (and per-step norm scale) exactly once per full timestep
         if params.forcing:
-            dt = new_state.t - state.t
-            new_forcing_state, new_forcing_key = ou_update(
-                new_state.forcing_state, new_state.forcing_key, dt, params, kgrid
-            )
-            new_state = new_state._replace(forcing_state=new_forcing_state, forcing_key=new_forcing_key)
+            new_state = _advance_forcing(new_state, state.t, kgrid, params)
         return new_state, None
     final_state,_ = jax.lax.scan(stepping,state,None,nblock)
     return final_state,None
@@ -55,14 +78,17 @@ def block_of_steps(state,kgrid,params,nblock,scheme,stepper):
 #currently an orbax checkpoint mngr must be set outside of the simulate function
 #this makes it a little easier to set up snapshots etc but could be changed
 
-def simulate_scan(state,kgrid,params,nblock,t_snap,t_end,mngr,schemestr='lsrk33',save=True):
+def simulate_scan(state,kgrid,params,nblock,t_snap,t_end,mngr,schemestr='lsrk33',save=True,print_every=1):
     # this simulates repeated fixed number of timesteps
     # for automatic differentiation sometime in the future
     # we should set nblock using the helper function estimate_good_nblock
     t_start = perf_counter()
     stepper,scheme = get_scheme(schemestr)
-    block_of_steps_jit = jax.jit(block_of_steps,static_argnums=(2,3,4,5))
-    t_last_snapshot = state.t
+    state = _refresh_forcing_scale(state, kgrid, params)
+    # donate_argnums=(0,): caller's input `state` buffer is consumed/reused for the output, since we always reassign `state` from the return value below.
+    block_of_steps_jit = jax.jit(block_of_steps,static_argnums=(2,3,4,5),donate_argnums=(0,))
+    # float(): pull to host so this doesn't alias state.t's buffer, which donate_argnums frees on the next jit call
+    t_last_snapshot = float(state.t)
     snap=max(mngr.all_steps(), default=-1)+1
     if params.size>1:
         snap = params.comm.bcast(snap, root=0)
@@ -71,9 +97,12 @@ def simulate_scan(state,kgrid,params,nblock,t_snap,t_end,mngr,schemestr='lsrk33'
             print("Saving initial state as snapshot "+str(snap))
         save_snapshot(snap,state,mngr)
         mngr.wait_until_finished()
+    block_count=0
     while state.t<t_end:
         state, _ = block_of_steps_jit(state,kgrid,params,nblock,scheme,stepper)
-        if params.rank==0:
+        block_count+=1
+        # only print every print_every-th block to cut down on host syncs from reading state.t
+        if params.rank==0 and block_count%print_every==0:
             print(state.t)
         if state.t - t_last_snapshot > t_snap and save:
             snap=snap+1
@@ -81,7 +110,7 @@ def simulate_scan(state,kgrid,params,nblock,t_snap,t_end,mngr,schemestr='lsrk33'
                 print("Saving snapshot "+str(snap))
             save_snapshot(snap,state,mngr)
             mngr.wait_until_finished()
-            t_last_snapshot=state.t
+            t_last_snapshot=float(state.t)
     snap=snap+1
     if save:
         if params.rank==0:
@@ -93,7 +122,7 @@ def simulate_scan(state,kgrid,params,nblock,t_snap,t_end,mngr,schemestr='lsrk33'
         print("Ending simulation at t = " + str(state.t)+". It took "+str(t_sim)+"s")
     return state
 
-def simulate(initial_state,kgrid,params,t_snap,t_end,mngr,schemestr='lsrk33',save=True):
+def simulate(initial_state,kgrid,params,t_snap,t_end,mngr,schemestr='lsrk33',save=True,print_every=1):
     t_start = perf_counter()
     stepper,scheme = get_scheme(schemestr)
     set_timestep = equation_registry[params.eqtype].set_timestep_func
@@ -101,19 +130,18 @@ def simulate(initial_state,kgrid,params,t_snap,t_end,mngr,schemestr='lsrk33',sav
     def stepper_wrapped(state):
         new_state = stepper(state,kgrid,params,rhs,set_timestep,scheme)
         if params.forcing:
-            dt = new_state.t - state.t
-            new_forcing_state, new_forcing_key = ou_update(
-                new_state.forcing_state, new_state.forcing_key, dt, params, kgrid
-            )
-            new_state = new_state._replace(forcing_state=new_forcing_state, forcing_key=new_forcing_key)
+            new_state = _advance_forcing(new_state, state.t, kgrid, params)
         return new_state
     def sim_to_next_snap(state,target_t):
         def snap_cond(state):
             return state.t<target_t
         return jax.lax.while_loop(snap_cond,stepper_wrapped,state)
-    sim_to_next_snap_jit = jax.jit(sim_to_next_snap)
-    state=initial_state
-    t_last_snapshot = state.t
+    # donate_argnums=(0,): caller's input `state` buffer is consumed/reused for the output, since we always reassign `state` from the return value below.
+    sim_to_next_snap_jit = jax.jit(sim_to_next_snap,donate_argnums=(0,))
+    # print_every: simulate has no non-snapshot prints currently, kept for API parity with simulate_scan; snapshot prints below stay unconditional.
+    state=_refresh_forcing_scale(initial_state, kgrid, params)
+    # float(): pull to host so this doesn't alias state.t's buffer, which donate_argnums frees on the next jit call
+    t_last_snapshot = float(state.t)
     snap=max(mngr.all_steps(), default=-1)+1
     if params.size>1:
         snap = params.comm.bcast(snap, root=0)
@@ -131,7 +159,7 @@ def simulate(initial_state,kgrid,params,t_snap,t_end,mngr,schemestr='lsrk33',sav
                 print ("Saving snapshot "+str(snap)+ " at t = "+str(state.t))
             save_snapshot(snap,state,mngr)
             mngr.wait_until_finished()
-            t_last_snapshot=state.t
+            t_last_snapshot=float(state.t)
     mngr.wait_until_finished()
     t_sim = perf_counter()-t_start
     if params.rank==0:

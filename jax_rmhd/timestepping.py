@@ -41,13 +41,10 @@ class LSRK_Scheme(NamedTuple):
     nstages: int
 
 # LSRK timestepper: includes an integrating factor for the dissipative terms.
-# The loop over stages is now done with jax.lax.scan to enforce boundary between stages
-# This seems to avoid so much CPU memory layout thrashing.
+# The stage loop is now statically unrolled by default (coefficients fold to compile-time
+# constants, init_rhs is freed after stage 0, no cond overhead); the previous lax.scan
+# variant is kept behind params.lsrk_scan=True for CPU memory-behavior comparison.
 def lsrk_advance(state, kgrid, params, rhs, set_timestep, scheme):
-    alphas_arr = jnp.array(scheme.alphas)
-    betas_arr = jnp.array(scheme.betas)
-    gammas_arr = jnp.array(scheme.gammas)
-
     init_rhs,grads = rhs(state,kgrid,params)
     if params.adaptive_timestep==True:
         dt = set_timestep(grads,params)
@@ -55,6 +52,28 @@ def lsrk_advance(state, kgrid, params, rhs, set_timestep, scheme):
         dt = params.dt
 
     diss_exponents = kgrid.hdiss_exponents(params) * dt
+
+    if params.lsrk_scan:
+        return _lsrk_scan_stages(state, kgrid, params, rhs, scheme, init_rhs, dt, diss_exponents)
+
+    current_state = state
+    delta = None
+    for istage in range(scheme.nstages):
+        alpha, beta, gamma = scheme.alphas[istage], scheme.betas[istage], scheme.gammas[istage]
+        # stage 0 reuses init_rhs (also used for dt above); alphas[0]=0 so delta starts at dt*rhs
+        stage_rhs = init_rhs if istage == 0 else rhs(current_state,kgrid,params)[0]
+        diss_factors = jnp.exp(diss_exponents*gamma)
+        delta = diss_factors * (dt*stage_rhs if istage == 0 else alpha*delta + dt*stage_rhs)
+        # forcing fields threaded through unchanged via _replace (see rk_advance comment above).
+        current_state = current_state._replace(t=current_state.t + gamma*dt,
+                                               fields=diss_factors*current_state.fields + beta*delta)
+    return current_state
+
+# Original lax.scan-over-stages variant of the LSRK stage loop (params.lsrk_scan=True).
+def _lsrk_scan_stages(state, kgrid, params, rhs, scheme, init_rhs, dt, diss_exponents):
+    alphas_arr = jnp.array(scheme.alphas)
+    betas_arr = jnp.array(scheme.betas)
+    gammas_arr = jnp.array(scheme.gammas)
 
     init_delta = jnp.zeros_like(state.fields)
     init_carry = (state,init_delta)
@@ -67,7 +86,7 @@ def lsrk_advance(state, kgrid, params, rhs, set_timestep, scheme):
 
         stage_rhs = jax.lax.cond(istage == 0,lambda: init_rhs,
                                  lambda: rhs(current_state,kgrid,params)[0])
-        
+
         diss_factors = jnp.exp(diss_exponents*gamma)
 
         next_delta = diss_factors * (alpha * delta + dt * stage_rhs)
@@ -75,7 +94,7 @@ def lsrk_advance(state, kgrid, params, rhs, set_timestep, scheme):
         next_t = current_state.t + gamma*dt
         # forcing_state/forcing_key threaded through unchanged (see rk_advance comment above).
         return (current_state._replace(t=next_t,fields=next_fields),next_delta), None
-    
+
     (final_state, _), _ = jax.lax.scan(scan_stage_func,init_carry,stage_pars)
 
     return final_state

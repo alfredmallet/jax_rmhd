@@ -7,7 +7,8 @@ from .types import SimulationState
 class Parameters():
     #Stores all static parameters for the problem
     def __init__(self,nx,ny,Lx,Ly,diss,hyper,cfl_safety,dt=0.1,adaptive_timestep=True,dims=2,nz=1,Lz=0.0,z_diss=0.25,z_diss_hyper=2.0,z_diff_order=4,eqtype="RMHD",
-                 forcing=False,forcing_mode="momentum",forcing_power=1.0,forcing_power_elsasser=(1.0,1.0),forcing_tau=1.0,fshell=(1,2),forcing_seed=0,forcing_scale_max=1.0):
+                 forcing=False,forcing_mode="momentum",forcing_power=1.0,forcing_power_elsasser=(1.0,1.0),forcing_tau=1.0,fshell=(1,2),forcing_seed=0,forcing_scale_max=1.0,
+                 forcing_norm_per_step=False,lsrk_scan=False):
         self.eqtype=eqtype
         self.nfields=eqtype_registry[self.eqtype]
         #perpendicular grid
@@ -65,7 +66,12 @@ class Parameters():
         self.fshell = fshell
         self.forcing_seed = forcing_seed
         self.forcing_scale_max = forcing_scale_max
+        # compute the forcing power-normalization scale once per full step (reused across
+        # RK sub-stages, removing per-stage allreduces) instead of exactly per stage
+        self.forcing_norm_per_step = forcing_norm_per_step
         self.n_ou = 1 if self.forcing_mode == "momentum" else 2
+        #timestepping (structure): use the lax.scan LSRK stage loop instead of the unrolled one
+        self.lsrk_scan = lsrk_scan
     def tree_flatten(self):
         children = ()
         param_data = {k: v for k, v in self.__dict__.items()}
