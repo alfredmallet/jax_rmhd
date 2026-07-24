@@ -77,19 +77,34 @@ mngr.wait_until_finished()
 params.comm.Barrier()
 ok = True
 
-# Check 1: every rank directory holds the identical set of snapshot indices.
+# Check 1: snapshot numbering is synchronized across rank dirs. Ranks that
+# existed before the restart may retain OLDER snapshots that the new ranks
+# never wrote (pruning trims each dir independently) -- that's benign. The
+# invariant is: (a) every rank dir has the same LATEST step, and (b) from the
+# newest "oldest step" over all dirs upward, all dirs agree exactly. The
+# original bug fails (a): pre-existing dirs ended on a higher index than
+# fresh ones (e.g. 20-39 vs 16-35).
 if is_control:
     per_rank = []
     for r in range(params.size):
         m = ocp.CheckpointManager(os.path.abspath(os.path.join(snap_path, str(r))),
                                   options=ocp.CheckpointManagerOptions())
         per_rank.append(sorted(m.all_steps()))
-    match = all(s == per_rank[0] for s in per_rank)
-    print(f"[check 1] snapshot indices per rank dir: {per_rank} -> {'PASS' if match else 'FAIL'}")
+    same_latest = len({s[-1] for s in per_rank}) == 1
+    floor = max(s[0] for s in per_rank)  # newest "oldest step" over all dirs
+    common = [x for x in per_rank[0] if x >= floor]
+    same_window = all([x for x in s if x >= floor] == common for s in per_rank)
+    match = same_latest and same_window
+    print(f"[check 1] snapshot indices per rank dir: {per_rank}")
+    print(f"[check 1] same latest={same_latest}, common window {common} identical={same_window} -> {'PASS' if match else 'FAIL'}")
     ok &= match
+    common_steps = common
+else:
+    common_steps = None
 ok = params.comm.bcast(ok, root=0)
+common_steps = params.comm.bcast(common_steps, root=0)
 
-# Check 2: the latest snapshot holds the same simulation time on every rank.
+# Check 2: every common snapshot holds the same simulation time on every rank.
 last = max(mngr.all_steps())
 ftype, ctype = sn.get_precision_types()
 nz_local = params.nz // params.size
@@ -98,11 +113,14 @@ state_like = SimulationState(
     fields=jax.ShapeDtypeStruct((params.nfields, nz_local, params.nx, params.ny // 2 + 1), ctype),
     forcing_state=jax.ShapeDtypeStruct((params.n_ou, 2, params.nx, params.ny // 2 + 1), ctype),
     forcing_key=jax.ShapeDtypeStruct((), sn.get_key_dtype()))
-own = mngr.restore(last, args=ocp.args.StandardRestore(state_like))
-ts_all = params.comm.allgather(float(own.t))
-t_match = (max(ts_all) - min(ts_all)) < 1e-12
-if is_control:
-    print(f"[check 2] t of snapshot {last} across ranks: {ts_all} -> {'PASS' if t_match else 'FAIL'}")
+t_match = True
+for step in common_steps:
+    own = mngr.restore(step, args=ocp.args.StandardRestore(state_like))
+    ts_all = params.comm.allgather(float(own.t))
+    step_match = (max(ts_all) - min(ts_all)) < 1e-12
+    t_match &= step_match
+    if is_control:
+        print(f"[check 2] t of snapshot {step} across ranks: min={min(ts_all):.6f} max={max(ts_all):.6f} -> {'PASS' if step_match else 'FAIL'}")
 ok &= t_match
 
 # Check 3: load_snapshot roundtrip of the latest snapshot matches end_state.
