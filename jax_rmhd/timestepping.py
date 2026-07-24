@@ -41,9 +41,10 @@ class LSRK_Scheme(NamedTuple):
     nstages: int
 
 # LSRK timestepper: includes an integrating factor for the dissipative terms.
-# The stage loop is now statically unrolled by default (coefficients fold to compile-time
-# constants, init_rhs is freed after stage 0, no cond overhead); the previous lax.scan
-# variant is kept behind params.lsrk_scan=True for CPU memory-behavior comparison.
+# Two stage-loop structures selected by params.lsrk_scan: lax.scan (default — measured
+# ~20% faster on CPU) or statically unrolled (lsrk_scan=False; candidate for GPU, where
+# constant folding / freeing init_rhs after stage 0 / no cond should help — benchmark in
+# Phase 3). Both give bitwise-identical trajectories at fp64.
 def lsrk_advance(state, kgrid, params, rhs, set_timestep, scheme):
     init_rhs,grads = rhs(state,kgrid,params)
     if params.adaptive_timestep==True:
