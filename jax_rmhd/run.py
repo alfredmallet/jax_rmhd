@@ -64,6 +64,8 @@ def simulate_scan(state,kgrid,params,nblock,t_snap,t_end,mngr,schemestr='lsrk33'
     block_of_steps_jit = jax.jit(block_of_steps,static_argnums=(2,3,4,5))
     t_last_snapshot = state.t
     snap=max(mngr.all_steps(), default=-1)+1
+    if params.size>1:
+        snap = params.comm.bcast(snap, root=0)
     if save:
         if params.rank==0:
             print("Saving initial state as snapshot "+str(snap))
@@ -113,6 +115,8 @@ def simulate(initial_state,kgrid,params,t_snap,t_end,mngr,schemestr='lsrk33',sav
     state=initial_state
     t_last_snapshot = state.t
     snap=max(mngr.all_steps(), default=-1)+1
+    if params.size>1:
+        snap = params.comm.bcast(snap, root=0)
     if save:
         if params.rank==0:
             print("Saving initial state as snapshot "+str(snap))

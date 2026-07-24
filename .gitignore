@@ -1,3 +1,6 @@
+#vscode
+.vscode/
+
 #Data (snapshots etc) folder
 data/
 examples/data
